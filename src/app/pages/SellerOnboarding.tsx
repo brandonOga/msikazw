@@ -11,6 +11,9 @@ import {
 import { useStore } from '../context/StoreContext';
 import { categories } from '../data/mockData';
 import { toast } from 'sonner';
+import { uploadSellerDoc } from '../../lib/storage';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { resendConfirmationEmail } from '../../lib/db/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -39,10 +42,12 @@ interface DocFile {
   label: string;
   required: boolean;
   filename: string | null;
+  url: string | null;     // Supabase Storage URL after upload
+  uploading: boolean;
   hint: string;
 }
 
-// ─── Step metadata ───────────────────────────────────────────────────────────
+// ─── Step metadata (4 steps only — OTP is a sub-step of Account) ─────────────
 const STEPS: { n: Step; label: string; sublabel: string; icon: React.ElementType }[] = [
   { n: 1, label: 'Account',       sublabel: 'Create your account',      icon: User },
   { n: 2, label: 'Business',      sublabel: 'About your business',       icon: Store },
@@ -356,26 +361,62 @@ function StepBusiness({
 }
 
 // ─── Step 3: Documents ────────────────────────────────────────────────────────
-function UploadBox({
-  doc, onUpload, onRemove,
+export function UploadBox({
+  doc, userId, onUploaded, onRemove,
 }: {
   doc: DocFile;
-  onUpload: (id: string, filename: string) => void;
+  userId?: string;
+  onUploaded: (id: string, filename: string | null, url: string | null, uploading?: boolean) => void;
   onRemove: (id: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+  const ALLOWED = ['image/jpeg', 'image/png', 'application/pdf'];
+
+  const processFile = async (file: File) => {
+    // validate
+    if (!ALLOWED.includes(file.type)) {
+      toast.error('Invalid file type. Accepts JPG, PNG or PDF.')
+      return
+    }
+    if (file.size > MAX_BYTES) {
+      toast.error('File too large. Max size is 5MB.')
+      return
+    }
+
+    // mark uploading true and show filename immediately
+    onUploaded(doc.id, file.name, null, true);
+
+    if (isSupabaseConfigured && userId) {
+      try {
+        const { url, error } = await uploadSellerDoc(userId, doc.id, file);
+        if (error) {
+          onUploaded(doc.id, null, null, false);
+          toast.error(`Upload failed: ${error}`);
+          return;
+        }
+        onUploaded(doc.id, file.name, url, false);
+      } catch (err: any) {
+        onUploaded(doc.id, null, null, false);
+        toast.error(`Upload error: ${err?.message || String(err)}`);
+      }
+    } else {
+      // Not configured — leave filename visible but mark not uploading
+      onUploaded(doc.id, file.name, null, false);
+    }
+  };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) onUpload(doc.id, file.name);
-  }, [doc.id, onUpload]);
+    if (file) processFile(file);
+  }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onUpload(doc.id, file.name);
+    if (file) processFile(file);
   };
 
   return (
@@ -396,21 +437,39 @@ function UploadBox({
       <p className="text-xs text-gray-400 mb-2">{doc.hint}</p>
 
       {doc.filename ? (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#009739] bg-green-50">
-          <div className="w-8 h-8 rounded-lg bg-[#009739] flex items-center justify-center shrink-0">
-            <Check className="w-4 h-4 text-white" />
+        doc.uploading ? (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50">
+            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+              <Loader2 className="w-4 h-4 text-gray-600 animate-spin" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 600 }}>{doc.filename}</p>
+              <p className="text-[11px] text-gray-600" style={{ fontWeight: 500 }}>Uploading…</p>
+            </div>
+            <button
+              disabled
+              className="p-1 rounded-lg text-gray-300 border-none bg-transparent cursor-default"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 600 }}>{doc.filename}</p>
-            <p className="text-[11px] text-[#009739]" style={{ fontWeight: 500 }}>Uploaded successfully</p>
+        ) : (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#009739] bg-green-50">
+            <div className="w-8 h-8 rounded-lg bg-[#009739] flex items-center justify-center shrink-0">
+              <Check className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 600 }}>{doc.filename}</p>
+              <p className="text-[11px] text-[#009739]" style={{ fontWeight: 500 }}>Uploaded successfully</p>
+            </div>
+            <button
+              onClick={() => onRemove(doc.id)}
+              className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors border-none bg-transparent cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={() => onRemove(doc.id)}
-            className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors border-none bg-transparent cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        )
       ) : (
         <div
           onClick={() => inputRef.current?.click()}
@@ -446,18 +505,19 @@ function UploadBox({
 }
 
 function StepDocuments({
-  docs, setDocs, errors, onNext, onBack, loading,
+  docs, setDocs, errors, onNext, onBack, loading, userId,
 }: {
   docs: DocFile[];
   setDocs: React.Dispatch<React.SetStateAction<DocFile[]>>;
   errors: Record<string, string>;
   onNext: () => void; onBack: () => void; loading: boolean;
+  userId?: string;
 }) {
-  const handleUpload = (id: string, filename: string) => {
-    setDocs(prev => prev.map(d => d.id === id ? { ...d, filename } : d));
+  const handleUploaded = (id: string, filename: string | null, url: string | null, uploading = false) => {
+    setDocs(prev => prev.map(d => d.id === id ? { ...d, filename, url, uploading } : d));
   };
   const handleRemove = (id: string) => {
-    setDocs(prev => prev.map(d => d.id === id ? { ...d, filename: null } : d));
+    setDocs(prev => prev.map(d => d.id === id ? { ...d, filename: null, url: null, uploading: false } : d));
   };
 
   const uploadedCount = docs.filter(d => d.filename).length;
@@ -488,7 +548,7 @@ function StepDocuments({
 
       <div className="space-y-5">
         {docs.map(doc => (
-          <UploadBox key={doc.id} doc={doc} onUpload={handleUpload} onRemove={handleRemove} />
+          <UploadBox key={doc.id} doc={doc} userId={userId} onUploaded={handleUploaded} onRemove={handleRemove} />
         ))}
       </div>
 
@@ -828,14 +888,21 @@ function StepApproved({ businessData, onGoToDashboard }: { businessData: Busines
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function SellerOnboarding() {
   const navigate = useNavigate();
-  const { user, login, onboardingStatus, sellerApplication, submitSellerApplication, approveSellerAccount } = useStore();
+  const { user, login, signUpWithEmail, verifyEmailOtp, onboardingStatus, sellerApplication, submitSellerApplication, approveSellerAccount } = useStore();
 
   const [step, setStep] = useState<Step>(() => {
-    if (onboardingStatus === 'approved') return 6;
-    if (onboardingStatus === 'pending') return 5;
+    if (onboardingStatus === 'approved' || onboardingStatus === 'pending') return 4;
     return 1;
   });
   const [maxReached, setMaxReached] = useState<Step>(step);
+
+  // OTP verification state (shown after step 1 account creation)
+  const [showOtp,         setShowOtp]         = useState(false);
+  const [pendingEmail,    setPendingEmail]     = useState('');
+  const [otpValue,        setOtpValue]         = useState('');
+  const [otpError,        setOtpError]         = useState('');
+  const [otpLoading,      setOtpLoading]       = useState(false);
+  const [otpResending,    setOtpResending]     = useState(false);
 
   const [accountData, setAccountData] = useState<AccountData>({
     name: user?.name || '', phone: user?.phone || '', email: user?.email || '',
@@ -847,8 +914,8 @@ export function SellerOnboarding() {
     city: '', address: '',
   });
   const [docs, setDocs] = useState<DocFile[]>([
-    { id: 'national-id',   label: 'National ID / Passport',              required: true,  filename: null, hint: 'Clear photo of the front of your ID' },
-    { id: 'selfie',        label: 'Selfie holding your ID',              required: true,  filename: null, hint: 'Hold your ID next to your face, clearly visible' },
+    { id: 'national-id', label: 'National ID / Passport',  required: true,  filename: null, url: null, uploading: false, hint: 'Clear photo of the front of your ID' },
+    { id: 'selfie',      label: 'Selfie holding your ID',  required: true,  filename: null, url: null, uploading: false, hint: 'Hold your ID next to your face, clearly visible' },
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -906,12 +973,46 @@ export function SellerOnboarding() {
     if (!validateAccount()) return;
     if (!user) {
       setLoading(true);
-      await new Promise(r => setTimeout(r, 1200));
-      login('buyer', accountData.name, accountData.phone, accountData.email);
-      toast.success('Account created!', { description: `Welcome to Msika, ${accountData.name}` });
-      setLoading(false);
+      if (isSupabaseConfigured && accountData.email) {
+        const { error, needsEmailConfirmation } = await signUpWithEmail({
+          email: accountData.email, password: accountData.password,
+          name: accountData.name, phone: accountData.phone, role: 'buyer',
+        });
+        setLoading(false);
+        if (error) { toast.error('Sign up failed', { description: error }); return; }
+        if (needsEmailConfirmation) {
+          setPendingEmail(accountData.email);
+          setShowOtp(true);
+          return;
+        }
+      } else {
+        // Offline fallback — skip OTP
+        login('buyer', accountData.name, accountData.phone, accountData.email);
+        setLoading(false);
+      }
     }
     goTo(2);
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpValue.length !== 6) { setOtpError('Enter the 6-digit code'); return; }
+    setOtpLoading(true);
+    setOtpError('');
+    const { error } = await verifyEmailOtp(pendingEmail, otpValue);
+    setOtpLoading(false);
+    if (error) { setOtpError('Invalid or expired code. Try resending.'); return; }
+    toast.success('Email verified!', { description: 'Let\'s set up your store.' });
+    setShowOtp(false);
+    goTo(2);
+  };
+
+  const handleResendOtp = async () => {
+    setOtpResending(true);
+    setOtpValue('');
+    setOtpError('');
+    await resendConfirmationEmail(pendingEmail);
+    setOtpResending(false);
+    toast.success('New code sent!', { description: `Check your inbox at ${pendingEmail}` });
   };
 
   const handleStep2Next = async () => {
@@ -932,8 +1033,7 @@ export function SellerOnboarding() {
 
   const handleSubmit = async () => {
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1800));
-    submitSellerApplication({
+    await submitSellerApplication({
       businessName: businessData.businessName,
       businessType: businessData.businessType,
       category: businessData.category,
@@ -942,23 +1042,25 @@ export function SellerOnboarding() {
       city: businessData.city,
       address: businessData.address,
       description: businessData.description,
-      documents: docs.filter(d => d.filename).map(d => d.filename!),
+      documents: docs.filter(d => d.filename).map(d => d.url || d.filename!),
     });
     setLoading(false);
-    goTo(5);
+    toast.success('Application submitted!', { description: 'Our team will review it shortly.' });
+    navigate('/seller-dashboard');
   };
 
+  // Keep for internal use — not shown in UI anymore
   const handleSimulateApproval = async () => {
     setApprovalLoading(true);
     await new Promise(r => setTimeout(r, 2200));
     approveSellerAccount();
     setApprovalLoading(false);
-    goTo(6);
+    navigate('/seller-dashboard');
     toast.success('🎉 Application approved!', { description: 'Your seller account is now live.' });
   };
 
   // ── Layout ────────────────────────────────────────────────────────────────
-  const isTerminalStep = step === 5 || step === 6;
+  const isTerminalStep = false; // no more terminal steps — submit goes to dashboard
 
   return (
     <div className="min-h-screen bg-white">
@@ -1000,8 +1102,8 @@ export function SellerOnboarding() {
           </div>
         </div>
 
-        {/* Progress stepper */}
-        {!isTerminalStep && (
+        {/* Progress stepper — hidden during OTP verification */}
+        {!showOtp && (
           <div className="mb-8">
             <ProgressStepper current={step} maxReached={maxReached} />
           </div>
@@ -1010,7 +1112,7 @@ export function SellerOnboarding() {
         {/* Step card */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {/* Card header */}
-          {!isTerminalStep && (
+          {!showOtp && (
             <div className="px-6 py-5 border-b border-gray-50" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fff 100%)' }}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[#009739] flex items-center justify-center shrink-0">
@@ -1027,8 +1129,83 @@ export function SellerOnboarding() {
           )}
 
           {/* Step content */}
-          <div className={isTerminalStep ? 'p-8' : 'p-6'}>
-            {step === 1 && (
+          <div className="p-6">
+            {/* OTP verification — shown inline after step 1 */}
+            {showOtp && (
+              <div className="text-center py-4">
+                <div className="mx-auto w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mb-4" style={{ border: '2px solid #009739' }}>
+                  <Mail className="w-6 h-6 text-[#009739]" />
+                </div>
+                <h3 className="text-lg text-gray-900 mb-1" style={{ fontWeight: 800 }}>Verify your email</h3>
+                <p className="text-sm text-gray-500 mb-1">Enter the 6-digit code sent to</p>
+                <p className="text-sm text-[#009739] mb-6" style={{ fontWeight: 700 }}>{pendingEmail}</p>
+
+                {/* OTP boxes */}
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <input
+                      key={i}
+                      id={`sel-otp-${i}`}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={otpValue[i] || ''}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        const next = otpValue.split('');
+                        next[i] = val.slice(-1);
+                        const joined = next.join('').slice(0, 6);
+                        setOtpValue(joined);
+                        setOtpError('');
+                        if (val && i < 5) (document.getElementById(`sel-otp-${i + 1}`) as HTMLInputElement)?.focus();
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Backspace' && !otpValue[i] && i > 0)
+                          (document.getElementById(`sel-otp-${i - 1}`) as HTMLInputElement)?.focus();
+                      }}
+                      onPaste={e => {
+                        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                        setOtpValue(pasted);
+                        setOtpError('');
+                        const nextFocus = Math.min(pasted.length, 5);
+                        (document.getElementById(`sel-otp-${nextFocus}`) as HTMLInputElement)?.focus();
+                        e.preventDefault();
+                      }}
+                      className="w-11 h-12 text-center text-xl border-2 rounded-xl outline-none transition-all"
+                      style={{
+                        fontWeight: 800,
+                        borderColor: otpError ? '#CE1126' : otpValue[i] ? '#009739' : '#e5e7eb',
+                        background: otpValue[i] ? 'rgba(0,151,57,0.04)' : '#fafafa',
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {otpError && <p className="text-xs text-red-500 mb-3">{otpError}</p>}
+
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={otpLoading || otpValue.length !== 6}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#009739] hover:bg-[#007f30] disabled:opacity-60 text-white rounded-xl text-sm border-none cursor-pointer mb-3 transition-colors"
+                  style={{ fontWeight: 700 }}
+                >
+                  {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {otpLoading ? 'Verifying…' : 'Verify & Continue →'}
+                </button>
+
+                <button
+                  onClick={handleResendOtp}
+                  disabled={otpResending}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:border-[#009739] hover:text-[#009739] transition-colors cursor-pointer bg-white disabled:opacity-60"
+                  style={{ fontWeight: 600 }}
+                >
+                  {otpResending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  {otpResending ? 'Sending…' : 'Resend code'}
+                </button>
+              </div>
+            )}
+
+            {!showOtp && step === 1 && (
               <StepAccount
                 user={user}
                 data={accountData}
@@ -1039,7 +1216,7 @@ export function SellerOnboarding() {
                 loading={loading}
               />
             )}
-            {step === 2 && (
+            {!showOtp && step === 2 && (
               <StepBusiness
                 data={businessData}
                 setData={setBusinessData}
@@ -1050,7 +1227,7 @@ export function SellerOnboarding() {
                 loading={loading}
               />
             )}
-            {step === 3 && (
+            {!showOtp && step === 3 && (
               <StepDocuments
                 docs={docs}
                 setDocs={setDocs}
@@ -1058,9 +1235,10 @@ export function SellerOnboarding() {
                 onNext={handleStep3Next}
                 onBack={() => goTo(2)}
                 loading={loading}
+                userId={user?.id}
               />
             )}
-            {step === 4 && (
+            {!showOtp && step === 4 && (
               <StepReview
                 accountData={accountData}
                 businessData={businessData}
@@ -1069,19 +1247,6 @@ export function SellerOnboarding() {
                 onSubmit={handleSubmit}
                 onBack={() => goTo(3)}
                 loading={loading}
-              />
-            )}
-            {step === 5 && (
-              <StepPending
-                application={sellerApplication}
-                onSimulateApproval={handleSimulateApproval}
-                approvalLoading={approvalLoading}
-              />
-            )}
-            {step === 6 && (
-              <StepApproved
-                businessData={businessData}
-                onGoToDashboard={() => navigate('/seller-dashboard')}
               />
             )}
           </div>

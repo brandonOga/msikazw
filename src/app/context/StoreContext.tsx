@@ -1,5 +1,14 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Product, products as allProducts } from '../data/mockData';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { Product } from '../data/mockData';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import * as authDb from '../../lib/db/auth';
+import * as ordersDb from '../../lib/db/orders';
+import * as sellersDb from '../../lib/db/sellers';
+import * as productsDb from '../../lib/db/products';
+import { fetchZigRate } from '../../lib/exchange';
+import { toast } from 'sonner';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type UserRole = 'guest' | 'buyer' | 'seller' | 'admin';
 export type Currency = 'USD' | 'ZiG';
@@ -81,7 +90,7 @@ export interface SellerApplication {
   address: string;
   description: string;
   submittedAt: string;
-  documents: string[]; // filenames
+  documents: string[];
 }
 
 export interface User {
@@ -125,9 +134,49 @@ export interface Notification {
   read: boolean;
 }
 
+// ── localStorage helpers ───────────────────────────────────────────────────────
+
+function load<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(`msika_${key}`);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function save<T>(key: string, value: T) {
+  try {
+    localStorage.setItem(`msika_${key}`, JSON.stringify(value));
+  } catch {
+    // storage quota exceeded — fail silently
+  }
+}
+
+function usePersistedState<T>(key: string, initial: T) {
+  const [state, setRaw] = useState<T>(() => load(key, initial));
+
+  const setState = useCallback((value: T | ((prev: T) => T)) => {
+    setRaw(prev => {
+      const next = typeof value === 'function' ? (value as (p: T) => T)(prev) : value;
+      save(key, next);
+      return next;
+    });
+  }, [key]);
+
+  return [state, setState] as const;
+}
+
+// ── Context type ──────────────────────────────────────────────────────────────
+
 interface StoreContextType {
   user: User | null;
+  authLoading: boolean;
+  sellerDbId: string | null;  // UUID of the seller record in the sellers table
   login: (role: UserRole, name?: string, phone?: string, email?: string) => void;
+  loginWithEmail: (email: string, password: string, role: 'buyer' | 'seller') => Promise<{ error: string | null }>;
+  signUpWithEmail: (params: { email: string; password: string; name: string; phone?: string; role: 'buyer' | 'seller' }) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
+  verifyEmailOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
 
@@ -165,95 +214,313 @@ interface StoreContextType {
   markAllRead: () => void;
   addNotification: (n: Omit<Notification, 'id' | 'read' | 'time'>) => void;
 
-  // Quotations
   quotations: QuotationRequest[];
   addQuotation: (q: Omit<QuotationRequest, 'id' | 'status' | 'date'>) => void;
 
-  // Pre-orders
   preOrders: PreOrder[];
   addPreOrder: (p: Omit<PreOrder, 'id' | 'status' | 'date'>) => void;
 
-  // Seller
   sellerProducts: Product[];
   addSellerProduct: (product: Omit<Product, 'id'>) => void;
   updateSellerProduct: (id: string, updates: Partial<Product>) => void;
   toggleProductStock: (id: string) => void;
   removeSellerProduct: (id: string) => void;
 
-  // Onboarding
   onboardingStatus: OnboardingStatus;
   sellerApplication: SellerApplication | null;
   submitSellerApplication: (app: Omit<SellerApplication, 'referenceNumber' | 'submittedAt'>) => void;
   approveSellerAccount: () => void;
 
-  // Reviews
   addReview: (productId: string, review: { user: string; rating: number; comment: string }) => void;
   getProductReviews: (productId: string) => { user: string; rating: number; comment: string; date: string }[];
   hasUserReviewed: (productId: string) => boolean;
 
-  // Back-in-stock
   backInStockIds: string[];
   toggleBackInStock: (productId: string) => void;
   isBackInStockNotified: (productId: string) => boolean;
 
-  // Disputes
   disputes: DisputeEntry[];
   submitDispute: (d: Omit<DisputeEntry, 'id' | 'status' | 'createdAt'>) => void;
 }
 
+// ── Provider ──────────────────────────────────────────────────────────────────
+
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
-const ZIG_RATE = 13.5;
-
-const SEED_NOTIFICATIONS: Notification[] = [
-  { id: 'n1', type: 'order', title: 'Order Dispatched', body: 'Your Wireless Earbuds Pro has been dispatched via DHL.', time: '2h ago', read: false },
-  { id: 'n2', type: 'promo', title: 'Flash Sale — 30% off Electronics', body: 'Today only! Use code FLASH30 at checkout.', time: '5h ago', read: false },
-  { id: 'n3', type: 'system', title: 'Welcome to Msika!', body: 'Your account is verified. Start shopping or open a store.', time: '1d ago', read: true },
-];
 
 export const StoreProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [wishlist, setWishlist] = useState<string[]>([]);
-  const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
+  // Auth state (not persisted directly — Supabase session handles it)
+  const [user, setUser]           = useState<User | null>(() => load<User | null>('user', null));
+  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+  const [sellerDbId, setSellerDbId]   = useState<string | null>(() => load<string | null>('sellerDbId', null));
+  const [zigRate, setZigRate]         = useState<number>(13.5);
+
+  // Persisted state
+  const [cart,             setCart]             = usePersistedState<CartItem[]>('cart', []);
+  const [wishlist,         setWishlist]         = usePersistedState<string[]>('wishlist', []);
+  const [recentlyViewed,   setRecentlyViewed]   = usePersistedState<string[]>('recentlyViewed', []);
+  const [currency,         setCurrency]         = usePersistedState<Currency>('currency', 'USD');
+  const [placedOrders,     setPlacedOrders]     = usePersistedState<PlacedOrder[]>('orders', []);
+  const [notifications,    setNotifications]    = usePersistedState<Notification[]>('notifications', []);
+  const [onboardingStatus, setOnboardingStatus] = usePersistedState<OnboardingStatus>('onboardingStatus', 'none');
+  const [sellerApplication,setSellerApplication]= usePersistedState<SellerApplication | null>('sellerApplication', null);
+  const [quotations,       setQuotations]       = usePersistedState<QuotationRequest[]>('quotations', []);
+  const [preOrders,        setPreOrders]        = usePersistedState<PreOrder[]>('preOrders', []);
+  const [backInStockIds,   setBackInStockIds]   = usePersistedState<string[]>('backInStock', []);
+  const [disputes,         setDisputes]         = usePersistedState<DisputeEntry[]>('disputes', []);
+  const [productReviews,   setProductReviews]   = usePersistedState<Record<string, { user: string; rating: number; comment: string; date: string }[]>>('reviews', {});
+  const [sellerProducts,   setSellerProducts]   = usePersistedState<Product[]>('sellerProducts', []);
+
+  // Non-persisted UI state
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [currency, setCurrency] = useState<Currency>('USD');
-  const [placedOrders, setPlacedOrders] = useState<PlacedOrder[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>(SEED_NOTIFICATIONS);
-  const [sellerProducts, setSellerProducts] = useState<Product[]>(
-    allProducts.filter(p => p.sellerId === 's1')
-  );
-  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus>('none');
-  const [sellerApplication, setSellerApplication] = useState<SellerApplication | null>(null);
 
-  const [quotations, setQuotations] = useState<QuotationRequest[]>([]);
-  const [preOrders, setPreOrders] = useState<PreOrder[]>([]);
-  const [backInStockIds, setBackInStockIds] = useState<string[]>([]);
-  const [disputes, setDisputes] = useState<DisputeEntry[]>([]);
-  const [productReviews, setProductReviews] = useState<Record<string, { user: string; rating: number; comment: string; date: string }[]>>({});
+  // ── Live ZiG exchange rate ─────────────────────────────────────────────
+  useEffect(() => { fetchZigRate().then(rate => setZigRate(rate)); }, []);
 
+  // ── Sync helpers ────────────────────────────────────────────────────────────
+  const syncOrdersFromSupabase = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const remoteOrders = await ordersDb.fetchOrders(userId);
+    if (remoteOrders.length > 0) setPlacedOrders(remoteOrders);
+  }, []);
+
+  const syncSellerDataFromSupabase = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const seller = await sellersDb.fetchSellerByUserId(userId);
+    if (!seller) return;
+
+    // Store the seller's DB UUID
+    setSellerDbId(seller.id as string);
+    save('sellerDbId', seller.id as string);
+
+    // Upgrade profile role to 'seller' in DB so future logins are correct
+    supabase.from('profiles').update({ role: 'seller' }).eq('id', userId).then(() => {});
+
+    // Update local user role immediately
+    setUser(prev => {
+      if (!prev || prev.role === 'seller' || prev.role === 'admin') return prev;
+      const updated = { ...prev, role: 'seller' as UserRole };
+      save('user', updated);
+      return updated;
+    });
+
+    // Load their products
+    const prods = await productsDb.fetchProducts({ sellerId: seller.id as string });
+    if (prods.length > 0) setSellerProducts(prods);
+  }, []);
+
+  const syncCartFromSupabase = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const { data } = await supabase.from('cart_items').select('*, products(*)').eq('user_id', userId);
+    if (data && data.length > 0) {
+      setCart(prev => {
+        const remoteItems = (data as Record<string, unknown>[]).map(row => {
+          const p = row.products as Record<string, unknown>;
+          return {
+            product: { id: p.id, name: p.name, price: Number(p.price), image: p.image, images: (p.images as string[]) || [], description: (p.description as string) || '', category: (p.category as string) || '', rating: Number(p.rating) || 0, reviews: [], reviewCount: Number(p.review_count) || 0, sellerId: p.seller_id as string, sellerName: '', tags: (p.tags as string[]) || [], inStock: p.in_stock !== false, deliveryBadge: (p.delivery_badge as string) || '', paymentMethods: (p.payment_methods as string[]) || [] } as Product,
+            quantity: Number(row.quantity),
+          };
+        });
+        const merged = [...remoteItems];
+        prev.forEach(local => { if (!merged.some(r => r.product.id === local.product.id)) merged.push(local); });
+        return merged;
+      });
+    }
+  }, []);
+
+  const syncWishlistFromSupabase = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const { data } = await supabase.from('wishlist').select('product_id').eq('user_id', userId);
+    if (data && data.length > 0) {
+      const remoteIds = (data as { product_id: string }[]).map(r => r.product_id);
+      setWishlist(prev => [...new Set([...prev, ...remoteIds])]);
+    }
+  }, []);
+
+  // ── Realtime: watch for seller approval ───────────────────────────────────
+  useEffect(() => {
+    if (!isSupabaseConfigured || !sellerDbId) return;
+
+    const channel = supabase
+      .channel(`seller-status-${sellerDbId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'sellers', filter: `id=eq.${sellerDbId}` },
+        (payload) => {
+          const newStatus = (payload.new as Record<string, unknown>).status as string;
+          if (newStatus === 'approved' && onboardingStatus !== 'approved') {
+            setOnboardingStatus('approved');
+            save('onboardingStatus', 'approved');
+            setUser(prev => {
+              if (!prev) return prev;
+              const updated = { ...prev, role: 'seller' as UserRole };
+              save('user', updated);
+              return updated;
+            });
+            toast.success('🎉 Seller account approved!', {
+              description: 'Your application has been approved. Your store is now live!',
+              duration: 6000,
+              position: 'bottom-center',
+            });
+          } else if (newStatus === 'rejected') {
+            setOnboardingStatus('rejected');
+            save('onboardingStatus', 'rejected');
+            toast.error('Application not approved', {
+              description: 'Your seller application was not approved. Please check your email for details.',
+              duration: 8000,
+              position: 'bottom-center',
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [sellerDbId, onboardingStatus]);
+
+  // ── Supabase auth session sync ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const profile = await authDb.getProfile(session.user.id);
+        if (profile) {
+          const u: User = {
+            id: profile.id,
+            name: profile.name,
+            phone: profile.phone || '',
+            email: session.user.email,
+            role: profile.role,
+            location: profile.location || undefined,
+          };
+          setUser(u);
+          save('user', u);
+          syncOrdersFromSupabase(profile.id);
+          syncCartFromSupabase(profile.id);
+          syncWishlistFromSupabase(profile.id);
+          syncSellerDataFromSupabase(profile.id); // always try — safe if no seller record exists
+        }
+      }
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        save('user', null);
+        setSellerDbId(null);
+        save('sellerDbId', null);
+      } else if (session?.user && event === 'SIGNED_IN') {
+        const profile = await authDb.getProfile(session.user.id);
+        if (profile) {
+          const u: User = {
+            id: profile.id,
+            name: profile.name,
+            phone: profile.phone || '',
+            email: session.user.email,
+            role: profile.role,
+            location: profile.location || undefined,
+          };
+          setUser(u);
+          save('user', u);
+          syncOrdersFromSupabase(profile.id);
+          syncCartFromSupabase(profile.id);
+          syncWishlistFromSupabase(profile.id);
+          syncSellerDataFromSupabase(profile.id); // always try — safe if no seller record exists
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Auth actions ───────────────────────────────────────────────────────────
+
+  // Offline/demo login (used when Supabase is not configured or for quick testing)
   const login = (role: UserRole, name = 'Tatenda Moyo', phone = '+263 77 123 4567', email?: string) => {
-    setUser({ id: 'u1', name, phone, email, role, location: 'Harare, Zimbabwe' });
+    const u: User = { id: 'u1', name, phone, email, role, location: 'Harare, Zimbabwe' };
+    setUser(u);
+    save('user', u);
+    setIsCartOpen(false);
+  };
+
+  const loginWithEmail = async (email: string, password: string, role: 'buyer' | 'seller'): Promise<{ error: string | null }> => {
+    if (!isSupabaseConfigured) {
+      login(role, 'Demo User', '', email);
+      return { error: null };
+    }
+
+    const { data, error } = await authDb.signIn({ email, password });
+    if (error) return { error: error.message };
+
+    if (data?.user) {
+      const profile = await authDb.getProfile(data.user.id);
+      if (profile) {
+        const u: User = {
+          id: profile.id,
+          name: profile.name,
+          phone: profile.phone || '',
+          email: data.user.email,
+          role: profile.role,
+          location: profile.location || undefined,
+        };
+        setUser(u);
+        save('user', u);
+      }
+    }
+
+    return { error: null };
+  };
+
+  const signUpWithEmail = async (params: {
+    email: string; password: string; name: string; phone?: string; role: 'buyer' | 'seller';
+  }): Promise<{ error: string | null; needsEmailConfirmation: boolean }> => {
+    if (!isSupabaseConfigured) {
+      login(params.role, params.name, params.phone || '', params.email);
+      return { error: null, needsEmailConfirmation: false };
+    }
+
+    const { data, error } = await authDb.signUp(params);
+    if (error) return { error: error.message, needsEmailConfirmation: false };
+
+    // If session is null after signup, Supabase requires email confirmation
+    const needsEmailConfirmation = !data?.session;
+    return { error: null, needsEmailConfirmation };
+  };
+
+  const verifyEmailOtp = async (email: string, token: string): Promise<{ error: string | null }> => {
+    return authDb.verifyEmailOtp(email, token);
+    // onAuthStateChange listener will handle setting user state after success
   };
 
   const logout = () => {
     setUser(null);
+    save('user', null);
     setIsCartOpen(false);
+    if (isSupabaseConfigured) authDb.signOut();
   };
 
-  const updateProfile = (data: Partial<User>) => {
-    setUser(prev => prev ? { ...prev, ...data } : prev);
+  const updateProfile = async (data: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...data };
+      save('user', updated);
+      return updated;
+    });
+    if (user?.id && isSupabaseConfigured) {
+      await authDb.updateProfile(user.id, {
+        name: data.name,
+        phone: data.phone,
+        location: data.location,
+      });
+    }
   };
 
-  const openCart = () => setIsCartOpen(true);
+  // ── Cart ───────────────────────────────────────────────────────────────────
+
+  const openCart  = () => setIsCartOpen(true);
   const closeCart = () => setIsCartOpen(false);
-
-  const toggleCurrency = () => setCurrency(c => c === 'USD' ? 'ZiG' : 'USD');
-
-  const formatPrice = (usd: number) => {
-    if (currency === 'ZiG') return `ZiG ${(usd * ZIG_RATE).toFixed(0)}`;
-    return `$${usd.toFixed(2).replace(/\.00$/, '')}`;
-  };
 
   const addToCart = (product: Product, quantity = 1) => {
     setCart(prev => {
@@ -262,49 +529,101 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       return [...prev, { product, quantity }];
     });
     setIsCartOpen(true);
+    // Sync to Supabase
+    if (user?.id && isSupabaseConfigured) {
+      supabase.from('cart_items').upsert(
+        { user_id: user.id, product_id: product.id, quantity },
+        { onConflict: 'user_id,product_id', ignoreDuplicates: false }
+      ).then(() => {});
+    }
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) { removeFromCart(productId); return; }
     setCart(prev => prev.map(i => i.product.id === productId ? { ...i, quantity } : i));
+    if (user?.id && isSupabaseConfigured) {
+      supabase.from('cart_items').update({ quantity }).eq('user_id', user.id).eq('product_id', productId).then(() => {});
+    }
   };
 
-  const removeFromCart = (productId: string) => setCart(prev => prev.filter(i => i.product.id !== productId));
-  const clearCart = () => setCart([]);
+  const removeFromCart = (productId: string) => {
+    setCart(prev => prev.filter(i => i.product.id !== productId));
+    if (user?.id && isSupabaseConfigured) {
+      supabase.from('cart_items').delete().eq('user_id', user.id).eq('product_id', productId).then(() => {});
+    }
+  };
+
+  const clearCart = () => {
+    setCart([]);
+    if (user?.id && isSupabaseConfigured) {
+      supabase.from('cart_items').delete().eq('user_id', user.id).then(() => {});
+    }
+  };
 
   const cartTotal = cart.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
   const cartItemsCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
+  // ── Wishlist & Recently Viewed ─────────────────────────────────────────────
+
   const toggleWishlist = (productId: string) => {
-    setWishlist(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
+    setWishlist(prev => {
+      const isIn = prev.includes(productId);
+      if (user?.id && isSupabaseConfigured) {
+        if (isIn) supabase.from('wishlist').delete().eq('user_id', user.id).eq('product_id', productId).then(() => {});
+        else supabase.from('wishlist').insert({ user_id: user.id, product_id: productId }).then(() => {});
+      }
+      return isIn ? prev.filter(id => id !== productId) : [...prev, productId];
+    });
   };
   const isWishlisted = (productId: string) => wishlist.includes(productId);
 
-  const addToRecentlyViewed = (productId: string) => {
+  const addToRecentlyViewed = (productId: string) =>
     setRecentlyViewed(prev => {
       if (prev.includes(productId)) return prev;
-      return [...prev, productId].slice(-5); // Keep only the last 5 viewed products
+      return [...prev, productId].slice(-5);
     });
+
+  // ── Currency ───────────────────────────────────────────────────────────────
+
+  const toggleCurrency = () => setCurrency(c => c === 'USD' ? 'ZiG' : 'USD');
+
+  const formatPrice = (usd: number) => {
+    if (currency === 'ZiG') return `ZiG ${(usd * zigRate).toFixed(0)}`;
+    return `$${usd.toFixed(2).replace(/\.00$/, '')}`;
   };
 
-  const addPlacedOrder = (order: PlacedOrder) => {
+  // ── Orders ─────────────────────────────────────────────────────────────────
+
+  const addPlacedOrder = async (order: PlacedOrder) => {
     setPlacedOrders(prev => [order, ...prev]);
     addNotification({ type: 'order', title: 'Order Placed!', body: `Your order #${order.id} is confirmed.` });
+    // Persist to Supabase if user is logged in
+    if (user?.id && isSupabaseConfigured) {
+      const saved = await ordersDb.createOrder(user.id, order);
+      if (saved) {
+        // Replace optimistic local order with DB record (gets real UUID)
+        setPlacedOrders(prev => [saved, ...prev.filter(o => o.id !== order.id)]);
+      }
+    }
   };
 
   const confirmDelivery = (orderId: string) => {
-    setPlacedOrders(prev => prev.map(o => o.id === orderId
-      ? { ...o, status: 'delivered', escrowStatus: 'released' }
-      : o
+    setPlacedOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, status: 'delivered', escrowStatus: 'released' } : o
     ));
     addNotification({ type: 'order', title: 'Delivery Confirmed', body: `Funds released to seller for order #${orderId}.` });
+    if (isSupabaseConfigured) {
+      ordersDb.updateOrderStatus(orderId, { status: 'delivered', escrow_status: 'released' });
+    }
   };
 
   const cancelOrder = (orderId: string) => {
-    setPlacedOrders(prev => prev.map(o => o.id === orderId
-      ? { ...o, status: 'cancelled', escrowStatus: 'disputed' }
-      : o
+    setPlacedOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, status: 'cancelled', escrowStatus: 'disputed' } : o
     ));
+    if (isSupabaseConfigured) {
+      ordersDb.updateOrderStatus(orderId, { status: 'cancelled', escrow_status: 'disputed' });
+    }
   };
 
   const reorder = (orderId: string) => {
@@ -315,8 +634,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // ── Notifications ──────────────────────────────────────────────────────────
 
+  const unreadCount = notifications.filter(n => !n.read).length;
   const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
 
   const addNotification = (n: Omit<Notification, 'id' | 'read' | 'time'>) => {
@@ -324,95 +644,152 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     setNotifications(prev => [newN, ...prev]);
   };
 
-  // Seller product management
-  const addSellerProduct = (product: Omit<Product, 'id'>) => {
-    const newProduct: Product = { ...product as Product, id: `sp_${Date.now()}` };
+  // ── Seller products ────────────────────────────────────────────────────────
+
+  const addSellerProduct = async (product: Omit<Product, 'id'>) => {
+    const tempId = `sp_${Date.now()}`;
+    const newProduct: Product = { ...product as Product, id: tempId };
     setSellerProducts(prev => [newProduct, ...prev]);
+    // Persist to Supabase
+    if (sellerDbId && isSupabaseConfigured) {
+      const saved = await productsDb.createProduct(sellerDbId, product);
+      if (saved) {
+        // Replace temp ID with real DB UUID
+        setSellerProducts(prev => [saved, ...prev.filter(p => p.id !== tempId)]);
+      }
+    }
   };
 
-  const updateSellerProduct = (id: string, updates: Partial<Product>) => {
+  const updateSellerProduct = async (id: string, updates: Partial<Product>) => {
     setSellerProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    if (isSupabaseConfigured) await productsDb.updateProduct(id, updates);
   };
 
-  const toggleProductStock = (id: string) => {
-    setSellerProducts(prev => prev.map(p => p.id === id ? { ...p, inStock: !p.inStock } : p));
+  const toggleProductStock = async (id: string) => {
+    let newInStock = true;
+    setSellerProducts(prev => prev.map(p => {
+      if (p.id === id) { newInStock = !p.inStock; return { ...p, inStock: !p.inStock }; }
+      return p;
+    }));
+    if (isSupabaseConfigured) await productsDb.updateProduct(id, { inStock: newInStock });
   };
 
-  const removeSellerProduct = (id: string) => {
+  const removeSellerProduct = async (id: string) => {
     setSellerProducts(prev => prev.filter(p => p.id !== id));
+    if (isSupabaseConfigured) await productsDb.deleteProduct(id);
   };
 
-  const submitSellerApplication = (app: Omit<SellerApplication, 'referenceNumber' | 'submittedAt'>) => {
+  // ── Seller onboarding ──────────────────────────────────────────────────────
+
+  const submitSellerApplication = async (app: Omit<SellerApplication, 'referenceNumber' | 'submittedAt'>) => {
+    let referenceNumber = `MSK-S${Date.now().toString().slice(-6)}`;
+
+    // Persist to Supabase if user is logged in
+    if (user?.id && isSupabaseConfigured) {
+      const result = await sellersDb.submitSellerApplication(user.id, app);
+      if (result) referenceNumber = result.referenceNumber;
+      // Immediately fetch and store the seller's DB UUID so product creation works right away
+      const seller = await sellersDb.fetchSellerByUserId(user.id);
+      if (seller) {
+        setSellerDbId(seller.id as string);
+        save('sellerDbId', seller.id as string);
+      }
+    }
+
     const application: SellerApplication = {
       ...app,
-      referenceNumber: `MSK-S${Date.now().toString().slice(-6)}`,
+      referenceNumber,
       submittedAt: new Date().toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }),
     };
     setSellerApplication(application);
     setOnboardingStatus('pending');
-    addNotification({ type: 'system', title: 'Application Received', body: `Your seller application ${application.referenceNumber} is under review.` });
+    addNotification({ type: 'system', title: 'Application Received', body: `Your seller application ${referenceNumber} is under review.` });
+
+    // Trigger transactional email via serverless endpoint (non-blocking)
+    try {
+      if (application && application.phone) {
+        // prefer email if available; fallback to phone (no-op)
+      }
+      if (typeof window !== 'undefined') {
+        fetch('/api/send-seller-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: user?.email || application.email || '', name: user?.name || application.businessName || 'Seller', referenceNumber }),
+        }).then(async res => {
+          if (!res.ok) {
+            const body = await res.text();
+            console.warn('Failed to send seller email:', res.status, body);
+          }
+        }).catch(err => console.warn('Send seller email error', err));
+      }
+    } catch (err) {
+      console.warn('Error triggering seller email', err);
+    }
   };
 
-  const approveSellerAccount = () => {
+  const approveSellerAccount = async () => {
     setOnboardingStatus('approved');
-    setUser(prev => prev ? { ...prev, role: 'seller' } : prev);
-    addNotification({ type: 'system', title: '🎉 Seller Account Approved!', body: 'Your store is now live on Msika. Start adding products!' });
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, role: 'seller' as UserRole };
+      save('user', updated);
+      return updated;
+    });
+    // Sync seller DB ID and products in case it wasn't fetched yet
+    if (user?.id && isSupabaseConfigured) {
+      await syncSellerDataFromSupabase(user.id);
+    }
+    addNotification({ type: 'system', title: 'Seller Account Approved!', body: 'Your store is now live on Msika. Start adding products!' });
   };
 
-  const addQuotation = (q: Omit<QuotationRequest, 'id' | 'status' | 'date'>) => {
-    const newQuotation: QuotationRequest = {
-      ...q,
-      id: `q_${Date.now()}`,
-      status: 'pending',
+  // ── Quotations & Pre-orders ────────────────────────────────────────────────
+
+  const addQuotation = (q: Omit<QuotationRequest, 'id' | 'status' | 'date'>) =>
+    setQuotations(prev => [{
+      ...q, id: `q_${Date.now()}`, status: 'pending',
       date: new Date().toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }),
-    };
-    setQuotations(prev => [newQuotation, ...prev]);
-  };
+    }, ...prev]);
 
-  const addPreOrder = (p: Omit<PreOrder, 'id' | 'status' | 'date'>) => {
-    const newPreOrder: PreOrder = {
-      ...p,
-      id: `po_${Date.now()}`,
-      status: 'deposit_paid',
+  const addPreOrder = (p: Omit<PreOrder, 'id' | 'status' | 'date'>) =>
+    setPreOrders(prev => [{
+      ...p, id: `po_${Date.now()}`, status: 'deposit_paid',
       date: new Date().toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }),
-    };
-    setPreOrders(prev => [newPreOrder, ...prev]);
-  };
+    }, ...prev]);
 
-  const addReview = (productId: string, review: { user: string; rating: number; comment: string }) => {
+  // ── Reviews ────────────────────────────────────────────────────────────────
+
+  const addReview = (productId: string, review: { user: string; rating: number; comment: string }) =>
     setProductReviews(prev => ({
       ...prev,
-      [productId]: [
-        ...(prev[productId] || []),
-        { ...review, date: 'Just now' },
-      ],
+      [productId]: [...(prev[productId] || []), { ...review, date: 'Just now' }],
     }));
-  };
 
   const getProductReviews = (productId: string) => productReviews[productId] || [];
+
   const hasUserReviewed = (productId: string) => {
     if (!user) return false;
     return (productReviews[productId] || []).some(r => r.user === user.name);
   };
 
-  const toggleBackInStock = (productId: string) => {
+  // ── Back-in-stock ──────────────────────────────────────────────────────────
+
+  const toggleBackInStock = (productId: string) =>
     setBackInStockIds(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
-  };
   const isBackInStockNotified = (productId: string) => backInStockIds.includes(productId);
 
-  const submitDispute = (d: Omit<DisputeEntry, 'id' | 'status' | 'createdAt'>) => {
-    const newDispute: DisputeEntry = {
-      ...d,
-      id: `d_${Date.now()}`,
-      status: 'open',
+  // ── Disputes ───────────────────────────────────────────────────────────────
+
+  const submitDispute = (d: Omit<DisputeEntry, 'id' | 'status' | 'createdAt'>) =>
+    setDisputes(prev => [{
+      ...d, id: `d_${Date.now()}`, status: 'open',
       createdAt: new Date().toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }),
-    };
-    setDisputes(prev => [newDispute, ...prev]);
-  };
+    }, ...prev]);
+
+  // ── Context value ──────────────────────────────────────────────────────────
 
   return (
     <StoreContext.Provider value={{
-      user, login, logout, updateProfile,
+      user, authLoading, sellerDbId, login, loginWithEmail, signUpWithEmail, verifyEmailOtp, logout, updateProfile,
       cart, addToCart, updateQuantity, removeFromCart, clearCart, cartTotal, cartItemsCount,
       wishlist, toggleWishlist, isWishlisted,
       recentlyViewed, addToRecentlyViewed,

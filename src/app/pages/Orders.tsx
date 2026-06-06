@@ -3,7 +3,6 @@ import {
   Package, ChevronRight, ShieldCheck, Star, X, Loader2,
   CheckCircle2, Clock, MapPin, Truck,
 } from 'lucide-react';
-import { mockOrders } from '../data/mockData';
 import { useStore, PlacedOrder, EscrowStatus } from '../context/StoreContext';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -270,8 +269,8 @@ function PlacedOrderCard({ order }: { order: PlacedOrder }) {
   );
 }
 
-// ─── Mock Order Card (from mockData) ──────────────────────────────────────────
-function MockOrderCard({ order }: { order: typeof mockOrders[0] }) {
+// ─── Legacy Order Card (kept for backwards compat, no longer used) ────────────
+function MockOrderCard({ order }: { order: { id: string; productName: string; productImage: string; sellerName: string; price: number; quantity: number; escrowStatus: string; deliveryMethod: string; trackingNumber?: string; deliveryPartner?: string; date: string } }) {
   const navigate = useNavigate();
   const [showTracker, setShowTracker] = useState(false);
   const [showReview, setShowReview] = useState(false);
@@ -415,17 +414,11 @@ export function Orders() {
     : activeTab === 'active' ? allPlaced.filter(o => ['pending','confirmed','in_transit'].includes(o.status))
     : allPlaced.filter(o => o.status === 'delivered' || o.status === 'cancelled');
 
-  const filteredMock = activeTab === 'all' ? mockOrders
-    : activeTab === 'active' ? mockOrders.filter(o => o.status === 'pending' || o.status === 'confirmed')
-    : mockOrders.filter(o => o.status === 'delivered');
+  const totalCount     = allPlaced.length;
+  const activeCount    = allPlaced.filter(o => ['pending','confirmed','in_transit'].includes(o.status)).length;
+  const deliveredCount = allPlaced.filter(o => o.status === 'delivered').length;
 
-  const totalCount = allPlaced.length + mockOrders.length;
-  const activeCount = allPlaced.filter(o => ['pending','confirmed','in_transit'].includes(o.status)).length
-    + mockOrders.filter(o => o.status === 'pending' || o.status === 'confirmed').length;
-  const deliveredCount = allPlaced.filter(o => o.status === 'delivered').length
-    + mockOrders.filter(o => o.status === 'delivered').length;
-
-  const isEmpty = filteredPlaced.length === 0 && filteredMock.length === 0;
+  const isEmpty = filteredPlaced.length === 0;
 
   return (
     <div className="bg-white min-h-screen">
@@ -498,9 +491,6 @@ export function Orders() {
           <div className="space-y-3">
             {filteredPlaced.map(order => (
               <PlacedOrderCard key={order.id} order={order} />
-            ))}
-            {filteredMock.map(order => (
-              <MockOrderCard key={order.id} order={order} />
             ))}
           </div>
         )}

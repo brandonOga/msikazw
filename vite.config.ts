@@ -10,11 +10,14 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      // Alias @ to the src directory
       '@': path.resolve(__dirname, './src'),
     },
   },
-
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+  server: {
+    port: 5175,  // Change this to 5174, 5175, etc. for other projects
+  },
+  build: {
+    chunkSizeWarningLimit: 1600,
+  },
 })

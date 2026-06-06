@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useStore } from '../context/StoreContext';
-import { mockOrders } from '../data/mockData';
 import { toast } from 'sonner';
 
 // ── Edit Profile Modal ────────────────────────────────────────────────────────
@@ -205,7 +204,7 @@ export function Profile() {
   const [showAddresses, setShowAddresses] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
 
-  const totalOrders = placedOrders.length + mockOrders.length;
+  const totalOrders = placedOrders.length;
 
   const menuSections = [
     {

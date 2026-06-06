@@ -2,7 +2,8 @@ import React, { useEffect } from 'react';
 import { X, Plus, Minus, Trash2, ShieldCheck, Lock, ArrowRight, ShoppingBag, Truck, ChevronRight } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router';
-import { products, getDeliveryEstimate, getCustomersAlsoBought } from '../data/mockData';
+import { getDeliveryEstimate } from '../data/mockData';
+import { useProducts } from '../../lib/hooks/useProducts';
 
 export function CartDrawer() {
   const {
@@ -26,11 +27,12 @@ export function CartDrawer() {
   const platformFee = cartTotal * 0.02;
   const total = cartTotal + platformFee;
 
-  // Get recommendations based on first cart item
+  // Get recommendations from live data
+  const { products: allProducts } = useProducts({ limit: 8 });
   const firstCartProduct = cart[0]?.product;
-  const recommendations = firstCartProduct
-    ? getCustomersAlsoBought(firstCartProduct.id, 4).filter(p => !cart.some(c => c.product.id === p.id))
-    : products.filter(p => !cart.some(c => c.product.id === p.id)).slice(0, 4);
+  const recommendations = allProducts
+    .filter(p => !cart.some(c => c.product.id === p.id) && p.id !== firstCartProduct?.id)
+    .slice(0, 4);
 
   const handleCheckout = () => {
     if (!user) {

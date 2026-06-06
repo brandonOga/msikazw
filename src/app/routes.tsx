@@ -1,47 +1,81 @@
 import { createBrowserRouter, Navigate } from "react-router";
-import { RootLayout } from "./RootLayout";
-import { LandingPage } from "./pages/LandingPage";
-import { AuthPage } from "./pages/AuthPage";
-import { ShopPage } from "./pages/ShopPage";
-import { ProductPage } from "./pages/ProductPage";
-import { CartPage } from "./pages/CartPage";
-import { CheckoutPage } from "./pages/CheckoutPage";
-import { Orders } from "./pages/Orders";
-import { Profile } from "./pages/Profile";
-import { Categories } from "./pages/Categories";
-import { SellerStore } from "./pages/SellerStore";
-import { SellerDashboard } from "./pages/SellerDashboard";
-import { TrustCenterPage } from "./pages/TrustCenterPage";
-import { AllCategoriesPage } from "./pages/AllCategoriesPage";
+import { RootLayout }      from "./RootLayout";
+import { AuthLayout }      from "./AuthLayout";
+import { AdminLayout }     from "./AdminLayout";
+import { DashboardLayout } from "./DashboardLayout";
+
+import { LandingPage }      from "./pages/LandingPage";
+import { AuthPage }         from "./pages/AuthPage";
+import { ShopPage }         from "./pages/ShopPage";
+import { ProductPage }      from "./pages/ProductPage";
+import { CartPage }         from "./pages/CartPage";
+import { CheckoutPage }     from "./pages/CheckoutPage";
+import { Orders }           from "./pages/Orders";
+import { Profile }          from "./pages/Profile";
+import { Categories }       from "./pages/Categories";
+import { SellerStore }      from "./pages/SellerStore";
+import { SellerDashboard }  from "./pages/SellerDashboard";
 import { SellerOnboarding } from "./pages/SellerOnboarding";
-import { ShopsPage } from "./pages/ShopsPage";
-import { WishlistPage } from "./pages/WishlistPage";
-import { AdminDashboard } from "./pages/AdminDashboard";
+import { TrustCenterPage }  from "./pages/TrustCenterPage";
+import { AllCategoriesPage} from "./pages/AllCategoriesPage";
+import { ShopsPage }        from "./pages/ShopsPage";
+import { WishlistPage }     from "./pages/WishlistPage";
+import { AdminDashboard }   from "./pages/AdminDashboard";
+import { AdminLogin }       from "./pages/AdminLogin";
+import { AuthConfirm }      from "./pages/AuthConfirm";
 
 export const router = createBrowserRouter([
+
+  // ── Storefront — navbar + footer ──────────────────────────────────────────
   {
-    path: "/",
+    path: '/',
     Component: RootLayout,
     children: [
-      { index: true, Component: LandingPage },
-      { path: "login", Component: AuthPage },
-      { path: "signup", Component: AuthPage },
-      { path: "shop", Component: ShopPage },
-      { path: "product/:id", Component: ProductPage },
-      { path: "cart", Component: CartPage },
-      { path: "checkout", Component: CheckoutPage },
-      { path: "orders", Component: Orders },
-      { path: "profile", Component: Profile },
-      { path: "categories", Component: Categories },
-      { path: "store/:id", Component: SellerStore },
-      { path: "seller-dashboard", Component: SellerDashboard },
-      { path: "seller-onboarding", Component: SellerOnboarding },
-      { path: "admin-dashboard", Component: AdminDashboard },
-      { path: "trust-center", Component: TrustCenterPage },
-      { path: "all-categories", Component: AllCategoriesPage },
-      { path: "shops", Component: ShopsPage },
-      { path: "wishlist", Component: WishlistPage },
-      { path: "*", Component: () => <Navigate to="/" replace /> },
+      { index: true,            Component: LandingPage       },
+      { path: 'shop',           Component: ShopPage          },
+      { path: 'product/:id',    Component: ProductPage       },
+      { path: 'cart',           Component: CartPage          },
+      { path: 'checkout',       Component: CheckoutPage      },
+      { path: 'orders',         Component: Orders            },
+      { path: 'profile',        Component: Profile           },
+      { path: 'categories',     Component: Categories        },
+      { path: 'store/:id',      Component: SellerStore       },
+      { path: 'trust-center',   Component: TrustCenterPage   },
+      { path: 'all-categories', Component: AllCategoriesPage },
+      { path: 'shops',          Component: ShopsPage         },
+      { path: 'wishlist',       Component: WishlistPage      },
+      { path: '*',              Component: () => <Navigate to="/" replace /> },
+    ],
+  },
+
+  // ── Seller pages — no storefront navbar (seller dashboard has its own) ────
+  {
+    path: '/',
+    Component: DashboardLayout,
+    children: [
+      { path: 'seller-dashboard',  Component: SellerDashboard  },
+      { path: 'seller-onboarding', Component: SellerOnboarding },
+    ],
+  },
+
+  // ── Auth — no header, no footer ───────────────────────────────────────────
+  {
+    path: '/',
+    Component: AuthLayout,
+    children: [
+      { path: 'login',        Component: AuthPage    },
+      { path: 'signup',       Component: AuthPage    },
+      { path: 'auth/confirm', Component: AuthConfirm },
+      { path: 'admin/login',  Component: AdminLogin  },
+    ],
+  },
+
+  // ── Admin — shared dashboard header ───────────────────────────────────────
+  {
+    path: '/',
+    Component: AdminLayout,
+    children: [
+      { path: 'admin-dashboard', Component: AdminDashboard },
     ],
   },
 ]);

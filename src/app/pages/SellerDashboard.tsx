@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useStore } from '../context/StoreContext';
 import {
@@ -14,15 +14,19 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { mockOrders, categories } from '../data/mockData';
+import { categories } from '../data/mockData';
 import { Product } from '../data/mockData';
 import { EscrowStatus } from '../context/StoreContext';
 import { toast } from 'sonner';
 import { SellerFulfillmentModal, TrackOrderData } from '../components/OrderTracker';
+import { uploadProductImage } from '../../lib/storage';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { SELLER_HEADER_H } from '../DashboardLayout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = 'overview' | 'products' | 'orders' | 'payments' | 'analytics' | 'settings';
-type Order = typeof mockOrders[0];
+import type { PlacedOrder } from '../context/StoreContext';
+type Order = PlacedOrder;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ESCROW_META: Record<string, { bg: string; text: string; label: string; step: number }> = {
@@ -40,22 +44,7 @@ const STATUS_FLOW = [
   'in_transit', 'delivery_confirmed', 'released',
 ];
 
-const REVENUE_DATA = [
-  { month: 'Oct', revenue: 340, orders: 12 },
-  { month: 'Nov', revenue: 520, orders: 18 },
-  { month: 'Dec', revenue: 890, orders: 28 },
-  { month: 'Jan', revenue: 460, orders: 15 },
-  { month: 'Feb', revenue: 710, orders: 23 },
-  { month: 'Mar', revenue: 580, orders: 19 },
-];
-
-const CATEGORY_DATA = [
-  { name: 'Electronics', revenue: 1240 },
-  { name: 'Fashion', revenue: 890 },
-  { name: 'Beauty', revenue: 560 },
-  { name: 'Food', revenue: 340 },
-  { name: 'Home', revenue: 280 },
-];
+// Revenue and category data are computed from real orders below (inside the component)
 
 // ─── Shared atoms ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -69,8 +58,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Product Modal ────────────────────────────────────────────────────────────
-function ProductModal({ product, onSave, onClose }: {
-  product?: Product; onSave: (d: Omit<Product, 'id'>) => void; onClose: () => void;
+function ProductModal({ product, onSave, onClose, userId }: {
+  product?: Product; onSave: (d: Omit<Product, 'id'>) => void; onClose: () => void; userId?: string;
 }) {
   const isEdit = !!product;
   const [form, setForm] = useState({
@@ -80,13 +69,29 @@ function ProductModal({ product, onSave, onClose }: {
     inStock: product?.inStock ?? true, isDeal: product?.isDeal ?? false, isNew: product?.isNew ?? true,
     deliveryBadge: product?.deliveryBadge || 'Same-Day Delivery',
     paymentMethods: product?.paymentMethods || ['EcoCash'],
-    sellerId: 's1', sellerName: 'TechHaven ZW',
+    sellerId: '', sellerName: '',
     rating: product?.rating || 4.5, reviewCount: product?.reviewCount || 0,
     reviews: product?.reviews || [], images: product?.images || [],
     tags: product?.tags?.join(', ') || '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (isSupabaseConfigured && userId) {
+      setImageUploading(true);
+      const { url, error } = await uploadProductImage(userId, file);
+      setImageUploading(false);
+      if (error) { toast.error('Image upload failed', { description: error }); return; }
+      if (url) setForm(f => ({ ...f, image: url }));
+    } else {
+      // Offline: use object URL for preview only
+      setForm(f => ({ ...f, image: URL.createObjectURL(file) }));
+    }
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -181,16 +186,23 @@ function ProductModal({ product, onSave, onClose }: {
             {errors.category && <p className="text-xs text-red-500 mt-0.5">{errors.category}</p>}
           </div>
 
-          {/* Image URL with preview */}
+          {/* Image — upload or URL */}
           <div>
-            <label className="block text-xs text-gray-600 mb-1.5" style={{ fontWeight: 600 }}>Product image URL</label>
-            <input type="text" value={form.image}
-              onChange={e => setForm(f => ({ ...f, image: e.target.value }))}
-              placeholder="https://images.unsplash.com/…"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#009739] bg-gray-50"
-            />
+            <label className="block text-xs text-gray-600 mb-1.5" style={{ fontWeight: 600 }}>Product image</label>
+            <div className="flex gap-2 mb-2">
+              <input type="text" value={form.image}
+                onChange={e => setForm(f => ({ ...f, image: e.target.value }))}
+                placeholder="Paste image URL…"
+                className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#009739] bg-gray-50"
+              />
+              <label className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs cursor-pointer border border-gray-200 hover:border-[#009739] hover:bg-green-50 transition-colors whitespace-nowrap" style={{ fontWeight: 600, color: imageUploading ? '#009739' : '#374151' }}>
+                {imageUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                {imageUploading ? 'Uploading…' : 'Upload'}
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={imageUploading} />
+              </label>
+            </div>
             {form.image && (
-              <div className="mt-2 w-16 h-16 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+              <div className="w-20 h-20 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
                 <img src={form.image} alt="preview" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
             )}
@@ -430,12 +442,25 @@ function ChartTooltip({ active, payload, label, prefix = '$' }: any) {
 export function SellerDashboard() {
   const navigate = useNavigate();
   const {
-    user, formatPrice, currency, toggleCurrency,
+    user, formatPrice, currency, toggleCurrency, sellerDbId,
     sellerProducts, addSellerProduct, updateSellerProduct, toggleProductStock, removeSellerProduct,
     notifications, unreadCount, markAllRead, addNotification,
+    placedOrders, onboardingStatus,
   } = useStore();
 
   const [tab, setTab] = useState<Tab>('overview');
+
+  // Show a bottom toast once when seller lands on dashboard with pending status
+  useEffect(() => {
+    if (onboardingStatus === 'pending') {
+      toast('⏳ Application under review', {
+        description: 'Our team usually reviews within 1–2 business days. You\'ll be notified here when approved.',
+        duration: 6000,
+        position: 'bottom-center',
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showWithdrawal, setShowWithdrawal] = useState(false);
@@ -473,11 +498,44 @@ export function SellerDashboard() {
   const [productView, setProductView] = useState<'list' | 'grid'>('list');
   const [orderFilter, setOrderFilter] = useState('all');
 
-  // Derived stats
-  const allOrders = mockOrders;
-  const totalSales = allOrders.reduce((s, o) => s + o.price * o.quantity, 0);
+  // Derived stats — use real placed orders from context
+  const allOrders = placedOrders;
+  const totalSales = allOrders.reduce((s, o) => s + o.total, 0);
   const platformFee = totalSales * 0.02;
   const netEarnings = totalSales - platformFee;
+
+  // ── Real chart data computed from orders ────────────────────────────────
+  const REVENUE_DATA = useMemo(() => {
+    const months: Record<string, { month: string; revenue: number; orders: number }> = {};
+    allOrders.forEach(o => {
+      const d = new Date(o.date);
+      const key = isNaN(d.getTime())
+        ? o.date.slice(0, 7)
+        : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = isNaN(d.getTime())
+        ? o.date.slice(0, 7)
+        : d.toLocaleString('en', { month: 'short' });
+      if (!months[key]) months[key] = { month: label, revenue: 0, orders: 0 };
+      months[key].revenue += o.total;
+      months[key].orders += 1;
+    });
+    const sorted = Object.entries(months).sort(([a], [b]) => a.localeCompare(b));
+    return sorted.length > 0
+      ? sorted.map(([, v]) => v)
+      : [{ month: 'No data', revenue: 0, orders: 0 }];
+  }, [allOrders]);
+
+  const CATEGORY_DATA = useMemo(() => {
+    const cats: Record<string, number> = {};
+    sellerProducts.forEach(p => {
+      cats[p.category] = (cats[p.category] || 0) + p.price;
+    });
+    const sorted = Object.entries(cats)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, revenue]) => ({ name, revenue }));
+    return sorted.length > 0 ? sorted : [{ name: 'No products', revenue: 0 }];
+  }, [sellerProducts]);
 
   const filteredProducts = sellerProducts.filter(p =>
     !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.category.toLowerCase().includes(productSearch.toLowerCase())
@@ -530,7 +588,12 @@ export function SellerDashboard() {
       {(showAddProduct || editingProduct) && (
         <ProductModal
           product={editingProduct ?? undefined}
-          onSave={data => { editingProduct ? updateSellerProduct(editingProduct.id, data) : addSellerProduct(data); setShowAddProduct(false); setEditingProduct(null); }}
+          userId={user?.id}
+          onSave={data => {
+            const withSeller = { ...data, sellerId: sellerDbId || '', sellerName: user?.name || '' };
+            editingProduct ? updateSellerProduct(editingProduct.id, withSeller) : addSellerProduct(withSeller);
+            setShowAddProduct(false); setEditingProduct(null);
+          }}
           onClose={() => { setShowAddProduct(false); setEditingProduct(null); }}
         />
       )}
@@ -580,6 +643,7 @@ export function SellerDashboard() {
         </div>
       )}
 
+
       {/* ─────────────── Sidebar ─────────────────────────────────────────────── */}
       {/* Mobile overlay */}
       {showMobileSidebar && (
@@ -589,11 +653,11 @@ export function SellerDashboard() {
         @media (min-width: 768px) { .seller-sidebar { transform: translateX(0) !important; } }
       `}</style>
       <aside
-        className="seller-sidebar fixed top-0 left-0 h-full flex flex-col z-30 border-r border-white/5 transition-transform duration-300"
+        className="seller-sidebar fixed left-0 flex flex-col z-30 border-r border-[#EAEAEA] transition-transform duration-300 bg-white"
         style={{
-          width: 228,
-          background: '#111111',
-          paddingTop: 64,
+          top: SELLER_HEADER_H,
+          height: `calc(100vh - ${SELLER_HEADER_H}px)`,
+          width: 256,
           transform: showMobileSidebar ? 'translateX(0)' : 'translateX(-100%)',
         }}
       >
@@ -607,16 +671,9 @@ export function SellerDashboard() {
         </button>
 
         {/* Seller profile */}
-        <div className="px-4 py-4 border-b border-white/8">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#009739] flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-4 h-4 text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-white truncate" style={{ fontSize: '0.82rem', fontWeight: 700 }}>{user?.name ?? 'TechHaven ZW'}</p>
-              <p style={{ fontSize: '0.65rem', color: '#009739', fontWeight: 600 }}>Verified Seller ✓</p>
-            </div>
-          </div>
+        <div className="px-5 py-5 border-b border-[#EAEAEA]">
+          <p className="text-gray-900 truncate" style={{ fontSize: '0.9rem', fontWeight: 800 }}>{user?.name ?? 'My Store'}</p>
+          <p style={{ fontSize: '0.7rem', color: '#009739', fontWeight: 600 }} className="mt-0.5">Seller</p>
         </div>
 
         {/* Nav items */}
@@ -625,12 +682,16 @@ export function SellerDashboard() {
             const active = tab === id;
             return (
               <button key={id} onClick={() => { setTab(id); setShowMobileSidebar(false); }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-left cursor-pointer border-none"
-                style={{ background: active ? '#009739' : 'transparent', color: active ? '#fff' : 'rgba(255,255,255,0.5)' }}>
-                <Icon style={{ width: 17, height: 17 }} className="shrink-0" />
-                <span style={{ fontSize: '0.82rem', fontWeight: active ? 700 : 400 }}>{label}</span>
+                className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all w-full text-left cursor-pointer border-none text-sm"
+                style={{
+                  background: active ? 'rgba(0,151,57,0.08)' : 'transparent',
+                  color: active ? '#009739' : '#6b7280',
+                  fontWeight: active ? 700 : 500,
+                }}>
+                <Icon style={{ width: 16, height: 16 }} className="shrink-0" />
+                {label}
                 {badge != null && (
-                  <span className="ml-auto px-1.5 py-0.5 rounded-full text-white min-w-[18px] text-center"
+                  <span className="ml-auto px-2 py-0.5 rounded-full text-white min-w-[20px] text-center"
                     style={{ background: badgeColor, fontSize: '0.6rem', fontWeight: 700 }}>
                     {badge}
                   </span>
@@ -639,29 +700,33 @@ export function SellerDashboard() {
             );
           })}
 
-          <div className="mt-3 pt-3 border-t border-white/8">
+          <div className="mt-2 pt-2 border-t border-[#EAEAEA]">
             <button onClick={() => setTab('settings')}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-left cursor-pointer border-none"
-              style={{ background: tab === 'settings' ? '#009739' : 'transparent', color: tab === 'settings' ? '#fff' : 'rgba(255,255,255,0.35)' }}>
-              <Settings style={{ width: 17, height: 17 }} className="shrink-0" />
-              <span style={{ fontSize: '0.82rem', fontWeight: tab === 'settings' ? 700 : 400 }}>Settings</span>
+              className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all w-full text-left cursor-pointer border-none text-sm"
+              style={{
+                background: tab === 'settings' ? 'rgba(0,151,57,0.08)' : 'transparent',
+                color: tab === 'settings' ? '#009739' : '#6b7280',
+                fontWeight: tab === 'settings' ? 700 : 500,
+              }}>
+              <Settings style={{ width: 16, height: 16 }} className="shrink-0" />
+              Settings
             </button>
-            <button onClick={() => navigate(`/store/s1`)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-left cursor-pointer border-none"
-              style={{ color: 'rgba(255,255,255,0.35)' }}>
-              <ExternalLink style={{ width: 17, height: 17 }} className="shrink-0" />
-              <span style={{ fontSize: '0.82rem', fontWeight: 400 }}>View my store</span>
+            <button onClick={() => navigate('/shop')}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all w-full text-left cursor-pointer border-none text-sm"
+              style={{ color: '#9ca3af', fontWeight: 500 }}>
+              <ExternalLink style={{ width: 16, height: 16 }} className="shrink-0" />
+              Visit storefront
             </button>
           </div>
         </nav>
 
         {/* Currency toggle */}
-        <div className="px-4 py-4 border-t border-white/8">
+        <div className="px-4 py-4 border-t border-[#EAEAEA]">
           <button onClick={toggleCurrency}
             className="w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer border-none transition-all"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>Currency</span>
-            <span className="flex items-center gap-1.5" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FFD100' }}>
+            style={{ background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+            <span style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 500 }}>Currency</span>
+            <span className="flex items-center gap-1.5" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#009739' }}>
               {currency} <RefreshCw className="w-3 h-3" />
             </span>
           </button>
@@ -669,7 +734,7 @@ export function SellerDashboard() {
       </aside>
 
       {/* ─────────────── Main Content ─────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col bg-white md:ml-[228px] ml-0">
+      <div className="flex-1 flex flex-col bg-white md:ml-64 ml-0">
 
         {/* Top header */}
         <header className="sticky top-0 z-20 bg-white border-b border-[#EAEAEA] px-4 md:px-8 h-16 flex items-center justify-between">
@@ -863,13 +928,13 @@ export function SellerDashboard() {
                     const qa = quickAction(order);
                     return (
                       <div key={order.id} className="px-6 py-4 flex items-center gap-4">
-                        <img src={order.productImage} alt={order.productName} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                        <img src={order.items[0]?.product.image || ''} alt={order.items[0]?.product.name || ''} className="w-10 h-10 rounded-xl object-cover shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-gray-900 truncate" style={{ fontSize: '0.85rem', fontWeight: 600 }}>{order.productName}</p>
+                          <p className="text-gray-900 truncate" style={{ fontSize: '0.85rem', fontWeight: 600 }}>{order.items[0]?.product.name || `Order #${order.id}`}</p>
                           <p className="text-gray-400" style={{ fontSize: '0.72rem' }}>#{order.id} · {order.date}</p>
                         </div>
                         <StatusBadge status={status} />
-                        <span className="text-gray-900 shrink-0" style={{ fontWeight: 700, fontSize: '0.88rem' }}>{formatPrice(order.price * order.quantity)}</span>
+                        <span className="text-gray-900 shrink-0" style={{ fontWeight: 700, fontSize: '0.88rem' }}>{formatPrice(order.total)}</span>
                         {qa ? (
                           <button onClick={() => { updateOrderStatus(order.id, qa.next); toast.success(`Order #${order.id} → ${ESCROW_META[qa.next]?.label}`); }}
                             className="shrink-0 px-2.5 py-1 rounded-lg text-xs text-white border-none cursor-pointer bg-[#009739] hover:bg-[#007f30] transition-colors"

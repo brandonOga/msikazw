@@ -7,7 +7,7 @@ import {
   Lock, Clock,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { products } from '../data/mockData';
+import { useProducts } from '../../lib/hooks/useProducts';
 import { ProductCard } from '../components/ProductCard';
 
 // ── Images ────────────────────────────────────────────────────────────────────
@@ -36,6 +36,7 @@ export const LandingPage = () => {
   const { user } = useStore();
   const navigate  = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const { products } = useProducts();
   const newProducts = products.filter(p => p.isNew);
 
   const handleSearch = (e: React.FormEvent) => {

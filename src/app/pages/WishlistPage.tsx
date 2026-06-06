@@ -2,12 +2,13 @@ import React from 'react';
 import { useNavigate } from 'react-router';
 import { Heart, ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { products } from '../data/mockData';
 import { ProductCard } from '../components/ProductCard';
+import { useProducts } from '../../lib/hooks/useProducts';
 
 export const WishlistPage = () => {
   const { wishlist, toggleWishlist, addToCart, formatPrice } = useStore();
   const navigate = useNavigate();
+  const { products } = useProducts();
 
   const wishlistProducts = wishlist
     .map(id => products.find(p => p.id === id))

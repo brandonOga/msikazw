@@ -4,12 +4,10 @@ import {
   CheckCircle, Search, MapPin, ArrowRight, Package,
   Sparkles, X, Trophy, Zap, ChevronLeft, ChevronRight, ChevronDown, Clock,
 } from 'lucide-react';
-import { sellers, getProductsBySeller } from '../data/mockData';
 import { StarRating } from '../components/StarRating';
+import { useSellers } from '../../lib/hooks/useProducts';
 
 const SHOPS_BANNER = 'https://images.unsplash.com/photo-1751965681712-697c555b8188?w=1600&q=80&fit=crop';
-
-const ALL_CATEGORIES = ['All', ...Array.from(new Set(sellers.map(s => s.category)))];
 
 const SHOP_SORT_OPTIONS = [
   { label: 'Featured',        value: 'default'  },
@@ -19,24 +17,16 @@ const SHOP_SORT_OPTIONS = [
   { label: 'A – Z',           value: 'az'       },
 ];
 
-const sortedByDate = [...sellers].sort((a, b) => new Date(b.joined).getTime() - new Date(a.joined).getTime());
-const newestSellers = sortedByDate.slice(0, 3);
-const risingStars   = sortedByDate.slice(3, 6);
-
-const topRatedSellers = [...sellers]
-  .sort((a, b) => b.rating - a.rating)
-  .slice(0, 5);
-
 // ── Reusable spotlight card ───────────────────────────────────────────────────
 function SpotlightCard({
   seller, badge, accentColor,
 }: {
-  seller: typeof sellers[0];
+  seller: { id: string; name: string; banner: string; logo: string; verified: boolean; location: string; rating: number; reviewCount: number; productCount: number; category: string };
   badge: string;
   accentColor: string;
 }) {
   const navigate = useNavigate();
-  const productCount = getProductsBySeller(seller.id).length || seller.productCount;
+  const productCount = seller.productCount;
 
   return (
     <button
@@ -164,6 +154,13 @@ export function ShopsPage() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [sortBy, setSortBy] = useState('default');
+  const { sellers } = useSellers();
+
+  const ALL_CATEGORIES = ['All', ...Array.from(new Set(sellers.map(s => s.category)))];
+  const sortedByDate     = [...sellers].sort((a, b) => new Date(b.joined).getTime() - new Date(a.joined).getTime());
+  const newestSellers    = sortedByDate.slice(0, 3);
+  const risingStars      = sortedByDate.slice(3, 6);
+  const topRatedSellers  = [...sellers].sort((a, b) => b.rating - a.rating).slice(0, 5);
 
   const pillsRef = useRef<HTMLDivElement>(null);
   const scrollPills = (dir: 'left' | 'right') => {

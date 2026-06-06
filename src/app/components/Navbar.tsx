@@ -8,7 +8,7 @@ import { useStore } from '../context/StoreContext';
 import { MsikaLogo } from './MsikaLogo';
 
 export const Navbar = () => {
-  const { user, cart, logout, cartItemsCount, openCart, currency, toggleCurrency, notifications, unreadCount, markAllRead, onboardingStatus } = useStore();
+  const { user, logout, cartItemsCount, openCart, currency, toggleCurrency, notifications, unreadCount, markAllRead } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,16 +102,6 @@ export const Navbar = () => {
               <Search className="w-5 h-5" />
             </button>
 
-            {/* Pending application badge */}
-            {user && onboardingStatus === 'pending' && (
-              <button
-                onClick={() => navigate('/seller-onboarding')}
-                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer border-none transition-colors"
-                style={{ background: 'rgba(255,209,0,0.15)', color: '#856404', fontWeight: 700, border: '1px solid rgba(255,209,0,0.4)' }}
-              >
-                <AlertCircle className="w-3.5 h-3.5" /> Application pending
-              </button>
-            )}
 
             {/* Cart */}
             <button
@@ -224,6 +214,7 @@ export const Navbar = () => {
                           { icon: Heart, label: 'Wishlist', path: '/wishlist' },
                           { icon: ShoppingBag, label: `Cart (${cartItemsCount})`, action: openCart },
                           ...(user.role === 'seller' ? [{ icon: LayoutDashboard, label: 'Seller Dashboard', path: '/seller-dashboard' }] : []),
+                          ...(user.role === 'admin'  ? [{ icon: LayoutDashboard, label: 'Admin Dashboard',  path: '/admin-dashboard'  }] : []),
                         ].map(item => (
                           <button
                             key={item.label}
@@ -251,13 +242,22 @@ export const Navbar = () => {
                 </div>
               </>
             ) : (
-              <Link
-                to="/signup"
-                className="bg-[#009739] hover:bg-[#007f30] text-white px-4 py-2 rounded-lg text-sm transition-colors"
-                style={{ fontWeight: 600 }}
-              >
-                Sign Up
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-700 hover:border-[#009739] hover:text-[#009739] transition-colors bg-white"
+                  style={{ fontWeight: 600 }}
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/signup"
+                  className="bg-[#009739] hover:bg-[#007f30] text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                  style={{ fontWeight: 600 }}
+                >
+                  Sign Up
+                </Link>
+              </div>
             )}
 
             {/* Mobile menu toggle */}

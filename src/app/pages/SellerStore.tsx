@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { getSellerById, getProductsBySeller, sellers, products } from '../data/mockData';
+import { useProducts, useSellers } from '../../lib/hooks/useProducts';
 import {
   Star, CheckCircle, ChevronLeft, ChevronRight, ChevronDown,
   Search, X, SlidersHorizontal, ArrowRight, MapPin, Clock,
@@ -100,9 +100,9 @@ const PRICE_OPTIONS = [
 ];
 
 // ── Inline shop card — matches "Top Rated on Msika" card style ────────────────
-function ShopCard({ s }: { s: typeof sellers[0] }) {
+function ShopCard({ s }: { s: { id: string; name: string; logo: string; banner: string; rating: number; reviewCount: number; verified: boolean; location: string; category: string; productCount: number } }) {
   const navigate = useNavigate();
-  const productCount = getProductsBySeller(s.id).length || s.productCount;
+  const productCount = s.productCount;
   return (
     <button
       onClick={() => navigate(`/store/${s.id}`)}
@@ -174,8 +174,10 @@ function ShopCard({ s }: { s: typeof sellers[0] }) {
 export function SellerStore() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const seller = getSellerById(id || '');
-  const allSellerProducts = seller ? getProductsBySeller(id || '') : [];
+  const { sellers } = useSellers();
+  const { products: allProducts } = useProducts({ sellerId: id });
+  const seller = sellers.find(s => s.id === id);
+  const allSellerProducts = allProducts;
 
   // Filter state
   const [activeCategory, setActiveCategory] = useState('All');
@@ -233,7 +235,7 @@ export function SellerStore() {
   // Other shops (exclude current)
   const otherShops = useMemo(() => (
     sellers.filter(s => s.id !== id).slice(0, 6)
-  ), [id]);
+  ), [id, sellers]);
 
   // Top rated (global)
   const topRated = useMemo(() => (

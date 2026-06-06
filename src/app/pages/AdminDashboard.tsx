@@ -1,36 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  LayoutDashboard, Users, Clock, ShoppingBag, DollarSign,
+  LayoutDashboard, Users, Clock,
   Search, ChevronDown, X,
   CheckCircle, XCircle, AlertCircle, Eye, Mail, Phone, MapPin,
-  FileText, Shield, MessageCircle, ArrowLeft,
+  FileText, Shield, MessageCircle, ArrowLeft, Loader2,
 } from 'lucide-react';
+import { useStore } from '../context/StoreContext';
+import { ADMIN_HEADER_H } from '../AdminLayout';
 import {
   SellerApplicationData, SellerApplicationStatus,
-  seedSellerApplications, Dispute, DisputeStatus,
+  Dispute, DisputeStatus,
 } from '../data/mockData';
+import * as adminDb from '../../lib/db/admin';
+import { isSupabaseConfigured } from '../../lib/supabase';
 
 type AdminView = 'dashboard' | 'pending-sellers' | 'disputes';
-
-// ── Seed disputes ─────────────────────────────────────────────────────
-const SEED_DISPUTES: Dispute[] = [
-  {
-    id: 'd1', orderId: 'ORD-1234', buyerName: 'Tino M.', sellerName: 'TechHaven ZW',
-    reason: 'not_received', description: 'Order was marked delivered but I never received it. The driver says it was left at the gate but nothing was there.',
-    status: 'open', createdAt: '9 Apr 2026', amount: 45,
-  },
-  {
-    id: 'd2', orderId: 'ORD-1240', buyerName: 'Chipo N.', sellerName: 'ThriftKing Harare',
-    reason: 'wrong_item', description: 'I ordered a size M denim jacket but received a size XL. Need exchange or refund.',
-    status: 'under_review', createdAt: '7 Apr 2026', amount: 25,
-  },
-  {
-    id: 'd3', orderId: 'ORD-1215', buyerName: 'Kudzi R.', sellerName: 'SneakerHeadz ZW',
-    reason: 'not_as_described', description: 'Sneakers were described as "brand new in box" but arrived with visible scuff marks and no box.',
-    status: 'resolved_buyer', createdAt: '1 Apr 2026', resolvedAt: '5 Apr 2026',
-    resolution: 'Full refund issued to buyer. Seller warned.', amount: 95,
-  },
-];
 
 const REASON_LABELS: Record<string, string> = {
   not_received: 'Item Not Received',
@@ -41,8 +25,10 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 export const AdminDashboard = () => {
-  const [applications, setApplications] = useState<SellerApplicationData[]>(seedSellerApplications);
-  const [disputes, setDisputes] = useState<Dispute[]>(SEED_DISPUTES);
+  const { user, authLoading } = useStore();
+  const [applications, setApplications] = useState<SellerApplicationData[]>([]);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [loading, setLoading] = useState(false);
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<SellerApplicationStatus | 'all'>('all');
@@ -50,18 +36,34 @@ export const AdminDashboard = () => {
   const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
   const [disputeResolution, setDisputeResolution] = useState('');
 
-  const updateApplicationStatus = (id: string, status: SellerApplicationStatus, notes?: string) => {
+  // Load real data from Supabase, fall back to seed data
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    setLoading(true);
+    Promise.all([
+      adminDb.fetchSellerApplications(),
+      adminDb.fetchDisputes(),
+    ]).then(([apps, disp]) => {
+      if (apps.length > 0) setApplications(apps);
+      if (disp.length > 0) setDisputes(disp);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const updateApplicationStatus = async (id: string, status: SellerApplicationStatus, notes?: string) => {
     setApplications(prev => prev.map(a => a.id === id ? { ...a, status, reviewNotes: notes || a.reviewNotes } : a));
     setSelectedApp(null);
+    await adminDb.updateSellerApplicationStatus(id, status, notes);
   };
 
-  const updateDisputeStatus = (id: string, status: DisputeStatus, resolution?: string) => {
+  const updateDisputeStatus = async (id: string, status: DisputeStatus, resolution?: string) => {
     setDisputes(prev => prev.map(d => d.id === id ? {
       ...d, status, resolution: resolution || d.resolution,
       resolvedAt: status.startsWith('resolved') || status === 'closed' ? new Date().toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }) : d.resolvedAt,
     } : d));
     setSelectedDispute(null);
     setDisputeResolution('');
+    await adminDb.updateDisputeStatus(id, status, resolution);
   };
 
   const filteredApps = applications.filter(a => {
@@ -78,6 +80,29 @@ export const AdminDashboard = () => {
     rejected: applications.filter(a => a.status === 'rejected').length,
     openDisputes: disputes.filter(d => d.status === 'open' || d.status === 'under_review').length,
   };
+
+  // Auth guard
+  if (authLoading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-[#009739]" />
+    </div>
+  );
+
+  if (!user || user.role !== 'admin') return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center px-6 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+        <Shield className="w-8 h-8 text-red-400" />
+      </div>
+      <h2 className="text-xl text-gray-900 mb-2" style={{ fontWeight: 800 }}>Access Denied</h2>
+      <p className="text-sm text-gray-500 max-w-xs">You need an admin account to view this page.</p>
+    </div>
+  );
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-[#009739]" />
+    </div>
+  );
 
   const getStatusStyle = (s: SellerApplicationStatus) => {
     switch (s) {
@@ -104,9 +129,9 @@ export const AdminDashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Mobile horizontal tab bar */}
-      <div className="md:hidden sticky top-16 z-20 bg-white border-b border-[#EAEAEA] px-4 py-2 flex gap-2 overflow-x-auto">
+      <div className="md:hidden sticky top-0 z-20 bg-white border-b border-[#EAEAEA] px-4 py-2 flex gap-2 overflow-x-auto">
         {NAV.map(n => (
           <button
             key={n.id}
@@ -130,11 +155,14 @@ export const AdminDashboard = () => {
         ))}
       </div>
 
-      {/* Sidebar — desktop only */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-[#EAEAEA] z-50 flex-col">
+      {/* Sidebar — desktop only, starts exactly below the fixed header */}
+      <aside
+        className="hidden md:flex fixed left-0 w-64 bg-white border-r border-[#EAEAEA] z-40 flex-col"
+        style={{ top: ADMIN_HEADER_H, height: `calc(100vh - ${ADMIN_HEADER_H}px)` }}
+      >
         <div className="p-6 border-b border-[#EAEAEA]">
-          <h1 className="text-gray-900" style={{ fontSize: '1.1rem', fontWeight: 800 }}>Msika Admin</h1>
-          <p className="text-xs text-gray-500 mt-1">Marketplace Control</p>
+          <h1 className="text-gray-900" style={{ fontSize: '1rem', fontWeight: 800 }}>Admin</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Marketplace Control</p>
         </div>
         <nav className="p-4 space-y-1">
           {NAV.map(n => (
@@ -165,7 +193,7 @@ export const AdminDashboard = () => {
         </nav>
       </aside>
 
-      {/* Main */}
+      {/* Main content — offset by sidebar width on desktop */}
       <main className="md:ml-64 p-4 md:p-8">
         {/* ── Dashboard Overview ── */}
         {currentView === 'dashboard' && (

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import {
-  getProductById, getSellerById, getProductsBySeller,
+  getSellerById, getProductsBySeller,
   getFrequentlyBoughtTogether, getSimilarProducts, getCustomersAlsoBought,
   getStockLeft, getViewingCount, getRecentPurchaseCount,
   getDeliveryEstimate, getSmartBadge, products,
   getDealEndTime, getBoughtTodayCount,
 } from '../data/mockData';
+import { useProductById } from '../../lib/hooks/useProducts';
 import { useStore } from '../context/StoreContext';
 import {
   Star, Truck, Plus, Minus, ShoppingBag, Heart, CheckCircle, Clock,
@@ -52,7 +53,8 @@ export const ProductPage = () => {
   const [reviewText, setReviewText] = useState('');
   const [reviewHoverRating, setReviewHoverRating] = useState(0);
 
-  const product = getProductById(id || '');
+  // Fetch product from Supabase (falls back to mock data automatically)
+  const { product, loading: productLoading } = useProductById(id || '');
   const seller = product ? getSellerById(product.sellerId) : undefined;
   const relatedProducts = product ? getProductsBySeller(product.sellerId).filter(p => p.id !== product.id) : [];
   const frequentlyBought = product ? getFrequentlyBoughtTogether(product.id) : [];
@@ -76,6 +78,15 @@ export const ProductPage = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  if (productLoading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 gap-4">
+        <div className="w-10 h-10 border-4 border-[#009739] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500">Loading product…</p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (

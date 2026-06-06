@@ -1,6 +1,7 @@
-import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { products, categories, sellers } from '../data/mockData';
+import { categories } from '../data/mockData';
+import { useProducts, useSellers } from '../../lib/hooks/useProducts';
 import {
   Search, ChevronDown, ChevronLeft, ChevronRight, X, ArrowRight, Star,
   Flame, Sparkles, Tag, BadgeCheck, TrendingUp, Zap,
@@ -34,13 +35,7 @@ const PRICE_OPTIONS = [
 
 const ALL_CATEGORIES = ['All', ...categories.map(c => c.name)];
 
-// ── Derived product shelves ──────────────────────────────────────────────────
-const topRated    = [...products].sort((a, b) => b.rating - a.rating).slice(0, 4);
-const bestSellers = [...products].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 4);
-const newArrivals = products.filter(p => p.isNew).slice(0, 4);
-const onSale      = products.filter(p => p.isDeal).slice(0, 4);
-const trendingNow = [...products].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(4, 8);
-const budgetPicks = [...products].filter(p => p.price < 20).slice(0, 4);
+const ITEMS_PER_PAGE = 20;
 
 export const ShopPage = () => {
   const navigate = useNavigate();
@@ -48,6 +43,19 @@ export const ShopPage = () => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [sortBy,         setSortBy]         = useState('default');
   const [priceRange,     setPriceRange]     = useState('all');
+  const [page,           setPage]           = useState(1);
+
+  // ── Live data from Supabase (falls back to mock if not configured) ───────────
+  const { products: allProducts } = useProducts();
+  const { sellers } = useSellers();                         // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  // ── Derived shelves (computed from live data) ─────────────────────────────
+  const topRated    = [...allProducts].sort((a, b) => b.rating - a.rating).slice(0, 4);
+  const bestSellers = [...allProducts].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 4);
+  const newArrivals = allProducts.filter(p => p.isNew).slice(0, 4);
+  const onSale      = allProducts.filter(p => p.isDeal).slice(0, 4);
+  const trendingNow = [...allProducts].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(4, 8);
+  const budgetPicks = [...allProducts].filter(p => p.price < 20).slice(0, 4);
 
   const pillsRef = useRef<HTMLDivElement>(null);
   const scrollPills = (dir: 'left' | 'right') => {
@@ -59,7 +67,7 @@ export const ShopPage = () => {
     priceRange !== 'all' || search.trim() !== '';
 
   const getFilteredProducts = () => {
-    let filtered = [...products];
+    let filtered = [...allProducts];
     if (search.trim()) {
       const q = search.toLowerCase();
       filtered = filtered.filter(p =>
@@ -94,7 +102,12 @@ export const ShopPage = () => {
     setSortBy('default');
     setPriceRange('all');
     setSearch('');
+    setPage(1);
   };
+
+  // Reset to page 1 when filters change
+  const totalPages   = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+  const pagedProducts = filteredProducts.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   // ── Section component ──────────────────────────────────────────────────────
   const Section = ({
@@ -104,7 +117,7 @@ export const ShopPage = () => {
     accent: string;
     label: string;
     title: string;
-    items: typeof products;
+    items: typeof allProducts;
     linkLabel?: string;
     linkTo: string;
   }) => (
@@ -177,7 +190,7 @@ export const ShopPage = () => {
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-white" style={{ fontSize: '0.82rem', fontWeight: 700 }}>{products.length}+</span>
+                  <span className="text-white" style={{ fontSize: '0.82rem', fontWeight: 700 }}>{allProducts.length}+</span>
                   <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>products listed</span>
                 </div>
                 <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
@@ -335,11 +348,46 @@ export const ShopPage = () => {
             </p>
           </div>
           {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {filteredProducts.map(product => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {pagedProducts.map(product => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-10">
+                  <button
+                    onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    disabled={page === 1}
+                    className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 disabled:opacity-40 hover:border-[#009739] hover:text-[#009739] transition-colors cursor-pointer bg-white"
+                    style={{ fontWeight: 600 }}
+                  >← Prev</button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                    .reduce<(number | '...')[]>((acc, p, i, arr) => {
+                      if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('...');
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, i) => p === '...' ? (
+                      <span key={`dot-${i}`} className="px-2 text-gray-400">…</span>
+                    ) : (
+                      <button key={p}
+                        onClick={() => { setPage(p as number); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                        className="w-9 h-9 rounded-xl text-sm border transition-colors cursor-pointer"
+                        style={{ fontWeight: 700, background: page === p ? '#009739' : '#fff', color: page === p ? '#fff' : '#374151', borderColor: page === p ? '#009739' : '#e5e7eb' }}
+                      >{p}</button>
+                    ))}
+                  <button
+                    onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    disabled={page === totalPages}
+                    className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 disabled:opacity-40 hover:border-[#009739] hover:text-[#009739] transition-colors cursor-pointer bg-white"
+                    style={{ fontWeight: 600 }}
+                  >Next →</button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-24">
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: '#f3f4f6' }}>
