@@ -5,6 +5,7 @@ import * as authDb from '../../lib/db/auth';
 import * as ordersDb from '../../lib/db/orders';
 import * as sellersDb from '../../lib/db/sellers';
 import * as productsDb from '../../lib/db/products';
+import * as quotationsDb from '../../lib/db/quotations';
 import { fetchZigRate } from '../../lib/exchange';
 import { toast } from 'sonner';
 
@@ -91,6 +92,7 @@ export interface SellerApplication {
   description: string;
   submittedAt: string;
   documents: string[];
+  email?: string;
 }
 
 export interface User {
@@ -284,6 +286,18 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     if (remoteOrders.length > 0) setPlacedOrders(remoteOrders);
   }, []);
 
+  const syncQuotationsFromSupabase = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const remote = await quotationsDb.fetchQuotations(userId);
+    if (remote.length > 0) setQuotations(remote);
+  }, []);
+
+  const syncPreOrdersFromSupabase = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const remote = await quotationsDb.fetchPreOrders(userId);
+    if (remote.length > 0) setPreOrders(remote);
+  }, []);
+
   const syncSellerDataFromSupabase = useCallback(async (userId: string) => {
     if (!isSupabaseConfigured) return;
     const seller = await sellersDb.fetchSellerByUserId(userId);
@@ -399,7 +413,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           syncOrdersFromSupabase(profile.id);
           syncCartFromSupabase(profile.id);
           syncWishlistFromSupabase(profile.id);
-          syncSellerDataFromSupabase(profile.id); // always try — safe if no seller record exists
+          syncSellerDataFromSupabase(profile.id);
+          syncQuotationsFromSupabase(profile.id);
+          syncPreOrdersFromSupabase(profile.id);
         }
       }
       setAuthLoading(false);
@@ -427,7 +443,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           syncOrdersFromSupabase(profile.id);
           syncCartFromSupabase(profile.id);
           syncWishlistFromSupabase(profile.id);
-          syncSellerDataFromSupabase(profile.id); // always try — safe if no seller record exists
+          syncSellerDataFromSupabase(profile.id);
+          syncQuotationsFromSupabase(profile.id);
+          syncPreOrdersFromSupabase(profile.id);
         }
       }
     });
@@ -744,17 +762,29 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
   // ── Quotations & Pre-orders ────────────────────────────────────────────────
 
-  const addQuotation = (q: Omit<QuotationRequest, 'id' | 'status' | 'date'>) =>
-    setQuotations(prev => [{
+  const addQuotation = async (q: Omit<QuotationRequest, 'id' | 'status' | 'date'>) => {
+    const localEntry: QuotationRequest = {
       ...q, id: `q_${Date.now()}`, status: 'pending',
       date: new Date().toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }),
-    }, ...prev]);
+    };
+    setQuotations(prev => [localEntry, ...prev]);
+    if (user?.id && isSupabaseConfigured) {
+      const saved = await quotationsDb.createQuotation(user.id, q);
+      if (saved) setQuotations(prev => [saved, ...prev.filter(x => x.id !== localEntry.id)]);
+    }
+  };
 
-  const addPreOrder = (p: Omit<PreOrder, 'id' | 'status' | 'date'>) =>
-    setPreOrders(prev => [{
+  const addPreOrder = async (p: Omit<PreOrder, 'id' | 'status' | 'date'>) => {
+    const localEntry: PreOrder = {
       ...p, id: `po_${Date.now()}`, status: 'deposit_paid',
       date: new Date().toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }),
-    }, ...prev]);
+    };
+    setPreOrders(prev => [localEntry, ...prev]);
+    if (user?.id && isSupabaseConfigured) {
+      const saved = await quotationsDb.createPreOrder(user.id, p);
+      if (saved) setPreOrders(prev => [saved, ...prev.filter(x => x.id !== localEntry.id)]);
+    }
+  };
 
   // ── Reviews ────────────────────────────────────────────────────────────────
 

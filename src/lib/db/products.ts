@@ -59,8 +59,8 @@ export async function createProduct(
       image: product.image,
       images: product.images,
       tags: product.tags,
-      is_new: product.isNew,
-      is_deal: product.isDeal,
+      is_new: true,
+      is_deal: false,
       in_stock: product.inStock,
       delivery_badge: product.deliveryBadge,
       payment_methods: product.paymentMethods,
@@ -166,5 +166,6 @@ function dbRowToProduct(row: Record<string, unknown>): Product {
     inStock: Boolean(row.in_stock),
     deliveryBadge: (row.delivery_badge as string) || 'Standard Delivery',
     paymentMethods: (row.payment_methods as string[]) || [],
+    createdAt: row.created_at as string | undefined,
   };
 }

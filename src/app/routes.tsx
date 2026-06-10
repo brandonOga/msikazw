@@ -15,6 +15,7 @@ import { Profile }          from "./pages/Profile";
 import { Categories }       from "./pages/Categories";
 import { SellerStore }      from "./pages/SellerStore";
 import { SellerDashboard }  from "./pages/SellerDashboard";
+import { SellerProductEdit } from "./pages/SellerProductEdit";
 import { SellerOnboarding } from "./pages/SellerOnboarding";
 import { TrustCenterPage }  from "./pages/TrustCenterPage";
 import { AllCategoriesPage} from "./pages/AllCategoriesPage";
@@ -23,6 +24,11 @@ import { WishlistPage }     from "./pages/WishlistPage";
 import { AdminDashboard }   from "./pages/AdminDashboard";
 import { AdminLogin }       from "./pages/AdminLogin";
 import { AuthConfirm }      from "./pages/AuthConfirm";
+import { ForgotPassword }   from "./pages/ForgotPassword";
+import { ResetPassword }    from "./pages/ResetPassword";
+import { SearchPage }       from "./pages/SearchPage";
+import { TermsPage }        from "./pages/TermsPage";
+import { PrivacyPage }      from "./pages/PrivacyPage";
 
 export const router = createBrowserRouter([
 
@@ -44,6 +50,9 @@ export const router = createBrowserRouter([
       { path: 'all-categories', Component: AllCategoriesPage },
       { path: 'shops',          Component: ShopsPage         },
       { path: 'wishlist',       Component: WishlistPage      },
+      { path: 'search',         Component: SearchPage        },
+      { path: 'terms',          Component: TermsPage         },
+      { path: 'privacy',        Component: PrivacyPage       },
       { path: '*',              Component: () => <Navigate to="/" replace /> },
     ],
   },
@@ -53,8 +62,10 @@ export const router = createBrowserRouter([
     path: '/',
     Component: DashboardLayout,
     children: [
-      { path: 'seller-dashboard',  Component: SellerDashboard  },
-      { path: 'seller-onboarding', Component: SellerOnboarding },
+      { path: 'seller-dashboard',            Component: SellerDashboard   },
+      { path: 'seller/products/new',         Component: SellerProductEdit },
+      { path: 'seller/products/:id/edit',    Component: SellerProductEdit },
+      { path: 'seller-onboarding',           Component: SellerOnboarding  },
     ],
   },
 
@@ -63,10 +74,12 @@ export const router = createBrowserRouter([
     path: '/',
     Component: AuthLayout,
     children: [
-      { path: 'login',        Component: AuthPage    },
-      { path: 'signup',       Component: AuthPage    },
-      { path: 'auth/confirm', Component: AuthConfirm },
-      { path: 'admin/login',  Component: AdminLogin  },
+      { path: 'login',           Component: AuthPage       },
+      { path: 'signup',          Component: AuthPage       },
+      { path: 'auth/confirm',    Component: AuthConfirm    },
+      { path: 'admin/login',     Component: AdminLogin     },
+      { path: 'forgot-password', Component: ForgotPassword },
+      { path: 'reset-password',  Component: ResetPassword  },
     ],
   },
 

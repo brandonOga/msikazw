@@ -47,17 +47,66 @@ export async function updateSellerApplicationStatus(
   if (error) console.error('[admin] updateSellerApplicationStatus:', error);
 
   // If approved, also update the user's role in profiles
-  if (status === 'approved') {
+  if (status === 'approved' || status === 'rejected') {
     const { data: seller } = await supabase
       .from('sellers')
-      .select('user_id')
+      .select('user_id, reference_no, profiles(name)')
       .eq('id', id)
       .single();
 
     if (seller?.user_id) {
-      await supabase.from('profiles').update({ role: 'seller' }).eq('id', seller.user_id);
+      if (status === 'approved') {
+        await supabase.from('profiles').update({ role: 'seller' }).eq('id', seller.user_id);
+      }
+
+      // Send status notification email (non-blocking)
+      const { data: authUser } = await supabase.auth.admin.getUserById(seller.user_id).catch(() => ({ data: null }));
+      const email = authUser?.user?.email;
+      const name = (seller.profiles as unknown as Record<string, string> | null)?.name || 'Seller';
+      const referenceNo = seller.reference_no as string;
+      if (email && referenceNo && typeof window !== 'undefined') {
+        fetch('/api/send-seller-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: email,
+            name,
+            referenceNumber: referenceNo,
+            type: status === 'approved' ? 'application_approved' : 'application_rejected',
+          }),
+        }).catch(err => console.warn('[admin] notify email error', err));
+      }
     }
   }
+}
+
+// ── Platform-wide stats ───────────────────────────────────────────────────────
+
+export interface PlatformStats {
+  totalOrders: number;
+  totalRevenue: number;
+  activeListings: number;
+  approvedSellers: number;
+}
+
+export async function fetchPlatformStats(): Promise<PlatformStats> {
+  if (!isSupabaseConfigured) return { totalOrders: 0, totalRevenue: 0, activeListings: 0, approvedSellers: 0 };
+
+  const [ordersRes, productsRes, sellersRes] = await Promise.all([
+    supabase.from('orders').select('total', { count: 'exact' }),
+    supabase.from('products').select('id', { count: 'exact' }).eq('in_stock', true),
+    supabase.from('sellers').select('id', { count: 'exact' }).eq('status', 'approved'),
+  ]);
+
+  const totalRevenue = ((ordersRes.data || []) as { total: number }[])
+    .reduce((sum, r) => sum + Number(r.total), 0);
+
+  return {
+    totalOrders: ordersRes.count ?? 0,
+    totalRevenue,
+    activeListings: productsRes.count ?? 0,
+    approvedSellers: sellersRes.count ?? 0,
+  };
 }
 
 // ── Disputes ─────────────────────────────────────────────────────────────────

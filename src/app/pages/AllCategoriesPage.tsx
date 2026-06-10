@@ -1,11 +1,11 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Search, ArrowUpRight, ShoppingBag, Sprout, Sparkles, ArrowRight, X,
-  ChevronLeft, ChevronRight, MapPin, LayoutGrid,
-  Star, Flame, Tag, TrendingUp, Zap,
+  Star, Flame, Tag, TrendingUp, Zap, Shirt, Utensils, Monitor, PawPrint, Home as HomeIcon,
 } from 'lucide-react';
 import { products, categories } from '../data/mockData';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { ProductCard } from '../components/ProductCard';
 
 const ALL_CATEGORIES_BANNER = 'https://images.unsplash.com/photo-1705745474141-eaab4ba053c9?w=1600&q=80&fit=crop';
@@ -35,6 +35,46 @@ const CATEGORY_IMAGES: Record<string, string> = {
   'Sports & Fitness':       'https://images.unsplash.com/photo-1710814824560-943273e8577e?w=800&q=85&fit=crop',
   'Books & Education':      'https://images.unsplash.com/photo-1707256786130-6d028236813f?w=800&q=85&fit=crop',
   'Construction Materials': 'https://images.unsplash.com/photo-1755288271423-462a0808deb9?w=800&q=85&fit=crop',
+  // Women's Fashion
+  "Women's Dresses":        'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=800&q=85&fit=crop',
+  "Women's Tops":           'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=800&q=85&fit=crop',
+  "Women's Bottoms":        'https://images.unsplash.com/photo-1594938298603-c8148c4b4571?w=800&q=85&fit=crop',
+  'Outerwear & Jackets':    'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&q=85&fit=crop',
+  'Activewear':             'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800&q=85&fit=crop',
+  "Men's Shirts & Tops":    'https://images.unsplash.com/photo-1602810316498-ab67cf68c8e1?w=800&q=85&fit=crop',
+  "Men's Shorts & Pants":   'https://images.unsplash.com/photo-1542272604-787c3835535d?w=800&q=85&fit=crop',
+  "Kids' Clothing":         'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=800&q=85&fit=crop',
+  'Swimwear':               'https://images.unsplash.com/photo-1473187983305-f615310e7daa?w=800&q=85&fit=crop',
+  'Lingerie & Sleepwear':   'https://images.unsplash.com/photo-1585487000160-6ebcfceb0d03?w=800&q=85&fit=crop',
+  'Heels & Sandals':        'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800&q=85&fit=crop',
+  'Backpacks & Luggage':    'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=85&fit=crop',
+  'Sunglasses & Eyewear':   'https://images.unsplash.com/photo-1508296695146-257a814070b4?w=800&q=85&fit=crop',
+  // Beauty
+  'Hair Care & Wigs':       'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=85&fit=crop',
+  'Makeup & Cosmetics':     'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=800&q=85&fit=crop',
+  'Nail Care':              'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&q=85&fit=crop',
+  // Home & Living
+  'Home Decor':             'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=85&fit=crop',
+  'Bedding & Pillows':      'https://images.unsplash.com/photo-1631049552057-403cdb8f0658?w=800&q=85&fit=crop',
+  'Kitchen Gadgets':        'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&q=85&fit=crop',
+  'Yoga & Pilates':         'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=85&fit=crop',
+  'Plus Size Fashion':      'https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?w=800&q=85&fit=crop',
+  'Pet Supplies':           'https://images.unsplash.com/photo-1601758125946-6ec2ef64daf8?w=800&q=85&fit=crop',
+  // Grocery
+  'Fresh Produce':          'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=85&fit=crop',
+  'Dairy & Eggs':           'https://images.unsplash.com/photo-1560493676-04071c5f467b?w=800&q=85&fit=crop',
+  'Meat & Poultry':         'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&q=85&fit=crop',
+  'Beverages & Drinks':     'https://images.unsplash.com/photo-1527960471264-932f39eb5846?w=800&q=85&fit=crop',
+  'Household Cleaning':     'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&q=85&fit=crop',
+  'Bread & Bakery':         'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=85&fit=crop',
+  // Tech
+  'Smart TVs & Displays':   'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&q=85&fit=crop',
+  'Gaming & Consoles':      'https://images.unsplash.com/photo-1585504198199-20277593b94f?w=800&q=85&fit=crop',
+  'Cameras & Photography':  'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=85&fit=crop',
+  // Furniture
+  'Living Room Furniture':  'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=85&fit=crop',
+  'Bedroom Furniture':      'https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=800&q=85&fit=crop',
+  'Office Furniture':       'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=800&q=85&fit=crop',
 };
 
 const SHORT_NAMES: Record<string, string> = {
@@ -54,49 +94,159 @@ const SHORT_NAMES: Record<string, string> = {
   'Sports & Fitness':       'Sports',
   'Books & Education':      'Books',
   'Construction Materials': 'Building',
+  "Women's Dresses":        'Dresses',
+  "Women's Tops":           "Women's Tops",
+  "Women's Bottoms":        "Women's Bottoms",
+  'Outerwear & Jackets':    'Outerwear',
+  'Activewear':             'Activewear',
+  "Men's Shirts & Tops":    "Men's Tops",
+  "Men's Shorts & Pants":   "Men's Pants",
+  "Kids' Clothing":         "Kids' Wear",
+  'Swimwear':               'Swimwear',
+  'Lingerie & Sleepwear':   'Lingerie',
+  'Heels & Sandals':        'Heels',
+  'Backpacks & Luggage':    'Bags',
+  'Sunglasses & Eyewear':   'Eyewear',
+  'Hair Care & Wigs':       'Hair',
+  'Makeup & Cosmetics':     'Makeup',
+  'Nail Care':              'Nails',
+  'Home Decor':             'Decor',
+  'Bedding & Pillows':      'Bedding',
+  'Kitchen Gadgets':        'Kitchen',
+  'Yoga & Pilates':         'Yoga',
+  'Plus Size Fashion':      'Plus Size',
+  'Pet Supplies':           'Pets',
+  'Fresh Produce':          'Produce',
+  'Dairy & Eggs':           'Dairy',
+  'Meat & Poultry':         'Meat',
+  'Beverages & Drinks':     'Beverages',
+  'Household Cleaning':     'Cleaning',
+  'Bread & Bakery':         'Bakery',
+  'Smart TVs & Displays':   'Smart TVs',
+  'Gaming & Consoles':      'Gaming',
+  'Cameras & Photography':  'Cameras',
+  'Living Room Furniture':  'Living Room',
+  'Bedroom Furniture':      'Bedroom',
+  'Office Furniture':       'Office',
 };
 
-// Themed sections — grouping all 16 categories
-const SECTIONS = [
+// Themed sections — all 50 categories
+const SECTIONS: Array<{ id: string; overline: string; title: string; iconColor: string; iconBg: string; bg: string; categories: string[] }> = [
   {
-    id:           'everyday',
-    overline:     'Most Popular',
-    title:        'Everyday Favourites',
-    iconColor:    '#009739',
-    iconBg:       'rgba(0,151,57,0.08)',
-    bg:           '#fff',
-    categories:   ['Fashion & Clothing', 'Food & Groceries', 'Beauty & Personal Care', 'Home & Furniture', 'Phones & Computers', 'Electronics & Gadgets'],
+    id:         'everyday',
+    overline:   'Most Popular',
+    title:      'Everyday Favourites',
+    iconColor:  '#009739',
+    iconBg:     'rgba(0,151,57,0.08)',
+    bg:         '#fff',
+    categories: ['Fashion & Clothing', 'Food & Groceries', 'Beauty & Personal Care', 'Home & Furniture', 'Phones & Computers', 'Electronics & Gadgets'],
   },
   {
-    id:           'trade',
-    overline:     'Grow & Build',
-    title:        'Business & Trade',
-    iconColor:    '#b8930a',
-    iconBg:       'rgba(255,209,0,0.12)',
-    bg:           '#fafafa',
-    categories:   ['Farming & Agriculture', 'Vehicles & Auto Parts', 'Services', 'Property & Rentals', 'Construction Materials'],
+    id:         'womens',
+    overline:   "Women's Collection",
+    title:      "Women's Fashion",
+    iconColor:  '#be185d',
+    iconBg:     'rgba(190,24,93,0.08)',
+    bg:         '#fafafa',
+    categories: ["Women's Dresses", "Women's Tops", "Women's Bottoms", 'Swimwear', 'Lingerie & Sleepwear', 'Heels & Sandals', 'Plus Size Fashion'],
   },
   {
-    id:           'discover',
-    overline:     'Unique Finds',
-    title:        'Discover More',
-    iconColor:    '#009739',
-    iconBg:       'rgba(0,151,57,0.08)',
-    bg:           '#fff',
-    categories:   ['Handmade & Crafts', 'Thrift / Second Hand', 'Baby Products', 'Sports & Fitness', 'Books & Education'],
+    id:         'mens',
+    overline:   "Men's Collection",
+    title:      "Men's Fashion",
+    iconColor:  '#1d4ed8',
+    iconBg:     'rgba(29,78,216,0.08)',
+    bg:         '#fff',
+    categories: ["Men's Shirts & Tops", "Men's Shorts & Pants", 'Outerwear & Jackets', 'Activewear'],
   },
-] as const;
+  {
+    id:         'kids',
+    overline:   'Young Ones',
+    title:      "Kids & Accessories",
+    iconColor:  '#7c3aed',
+    iconBg:     'rgba(124,58,237,0.08)',
+    bg:         '#fafafa',
+    categories: ["Kids' Clothing", 'Backpacks & Luggage', 'Sunglasses & Eyewear'],
+  },
+  {
+    id:         'beauty',
+    overline:   'Look & Feel Good',
+    title:      'Beauty & Wellness',
+    iconColor:  '#db2777',
+    iconBg:     'rgba(219,39,119,0.08)',
+    bg:         '#fff',
+    categories: ['Hair Care & Wigs', 'Makeup & Cosmetics', 'Nail Care', 'Yoga & Pilates'],
+  },
+  {
+    id:         'homeliving',
+    overline:   'Your Space',
+    title:      'Home & Living',
+    iconColor:  '#0d9488',
+    iconBg:     'rgba(13,148,136,0.08)',
+    bg:         '#fafafa',
+    categories: ['Home Decor', 'Bedding & Pillows', 'Kitchen Gadgets', 'Living Room Furniture', 'Bedroom Furniture', 'Office Furniture'],
+  },
+  {
+    id:         'grocery',
+    overline:   'Fresh & Tasty',
+    title:      'Food & Supermarket',
+    iconColor:  '#16a34a',
+    iconBg:     'rgba(22,163,74,0.08)',
+    bg:         '#fff',
+    categories: ['Fresh Produce', 'Dairy & Eggs', 'Meat & Poultry', 'Beverages & Drinks', 'Household Cleaning', 'Bread & Bakery'],
+  },
+  {
+    id:         'tech',
+    overline:   'Digital World',
+    title:      'Tech & Gaming',
+    iconColor:  '#2563eb',
+    iconBg:     'rgba(37,99,235,0.08)',
+    bg:         '#fafafa',
+    categories: ['Smart TVs & Displays', 'Gaming & Consoles', 'Cameras & Photography'],
+  },
+  {
+    id:         'pets',
+    overline:   'Furry Friends',
+    title:      'Pet Supplies',
+    iconColor:  '#ea580c',
+    iconBg:     'rgba(234,88,12,0.08)',
+    bg:         '#fff',
+    categories: ['Pet Supplies'],
+  },
+  {
+    id:         'trade',
+    overline:   'Grow & Build',
+    title:      'Business & Trade',
+    iconColor:  '#b8930a',
+    iconBg:     'rgba(255,209,0,0.12)',
+    bg:         '#fafafa',
+    categories: ['Farming & Agriculture', 'Vehicles & Auto Parts', 'Services', 'Property & Rentals', 'Construction Materials'],
+  },
+  {
+    id:         'discover',
+    overline:   'Unique Finds',
+    title:      'Discover More',
+    iconColor:  '#009739',
+    iconBg:     'rgba(0,151,57,0.08)',
+    bg:         '#fff',
+    categories: ['Handmade & Crafts', 'Thrift / Second Hand', 'Baby Products', 'Sports & Fitness', 'Books & Education'],
+  },
+];
 
 const SECTION_ICONS: Record<string, React.ReactNode> = {
-  everyday: <ShoppingBag className="w-4 h-4" />,
-  trade:    <Sprout className="w-4 h-4" />,
-  discover: <Sparkles className="w-4 h-4" />,
+  everyday:   <ShoppingBag className="w-4 h-4" />,
+  womens:     <Shirt className="w-4 h-4" />,
+  mens:       <Shirt className="w-4 h-4" />,
+  kids:       <Shirt className="w-4 h-4" />,
+  beauty:     <Sparkles className="w-4 h-4" />,
+  homeliving: <HomeIcon className="w-4 h-4" />,
+  grocery:    <Utensils className="w-4 h-4" />,
+  tech:       <Monitor className="w-4 h-4" />,
+  pets:       <PawPrint className="w-4 h-4" />,
+  trade:      <Sprout className="w-4 h-4" />,
+  discover:   <Sparkles className="w-4 h-4" />,
 };
 
-const FILTER_PILLS = [
-  { label: 'All', value: 'all' },
-  ...categories.map(c => ({ label: SHORT_NAMES[c.name] || c.name, value: c.name })),
-];
 
 // ── Product shelf section — mirrors ShopPage Section component ─────────────────
 function ProductSection({
@@ -243,40 +393,17 @@ function SectionHeader({
 // ── Page ───────────────────────────────────────────────────────────────────────
 export function AllCategoriesPage() {
   const navigate      = useNavigate();
-  const [search,      setSearch]      = useState('');
-  const [activeGroup, setActiveGroup] = useState<string>('all');
-
-  const pillsRef = useRef<HTMLDivElement>(null);
-  const scrollPills = (dir: 'left' | 'right') => {
-    pillsRef.current?.scrollBy({ left: dir === 'left' ? -240 : 240, behavior: 'smooth' });
-  };
+  const [search, setSearch] = useState('');
 
   const searchActive = search.trim().length > 0;
-  const categoryPillActive = activeGroup !== 'all' && !searchActive;
 
   // ── Derived product shelves ─────────────────────────────────────────────────
-  const catProducts = useMemo(() => (
-    activeGroup !== 'all'
-      ? products.filter(p => p.category === activeGroup)
-      : products
-  ), [activeGroup]);
-
-  const shortCatName = activeGroup !== 'all'
-    ? (SHORT_NAMES[activeGroup] || activeGroup)
-    : '';
-
-  const shelfTopRated    = useMemo(() => [...catProducts].sort((a, b) => b.rating - a.rating).slice(0, 4), [catProducts]);
-  const shelfBestSellers = useMemo(() => [...catProducts].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 4), [catProducts]);
-  const shelfNewArrivals = useMemo(() => catProducts.filter(p => p.isNew).slice(0, 4), [catProducts]);
-  const shelfOnSale      = useMemo(() => catProducts.filter(p => p.isDeal).slice(0, 4), [catProducts]);
-  const shelfTrending    = useMemo(() => [...catProducts].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(categoryPillActive ? 0 : 4, categoryPillActive ? 4 : 8), [catProducts, categoryPillActive]);
-  const shelfBudget      = useMemo(() => catProducts.filter(p => p.price < 20).slice(0, 4), [catProducts]);
-
-  const shopLink = activeGroup !== 'all'
-    ? `/shop?cat=${encodeURIComponent(activeGroup)}`
-    : '/shop';
-
-  // ── end derived shelves ─────────────────────────────────────────────────────
+  const shelfTopRated    = useMemo(() => [...products].sort((a, b) => b.rating - a.rating).slice(0, 4), []);
+  const shelfBestSellers = useMemo(() => [...products].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 4), []);
+  const shelfNewArrivals = useMemo(() => products.filter(p => p.isNew).slice(0, 4), []);
+  const shelfOnSale      = useMemo(() => products.filter(p => p.isDeal).slice(0, 4), []);
+  const shelfTrending    = useMemo(() => [...products].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(4, 8), []);
+  const shelfBudget      = useMemo(() => products.filter(p => p.price < 20).slice(0, 4), []);
 
   const searchResults = searchActive
     ? categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
@@ -284,23 +411,16 @@ export function AllCategoriesPage() {
 
   const visibleSections = SECTIONS.map(section => ({
     ...section,
-    cats: categoryPillActive
-      ? categories.filter(c => section.categories.includes(c.name) && c.name === activeGroup)
-      : categories.filter(c => section.categories.includes(c.name)),
+    cats: categories.filter(c => section.categories.includes(c.name)),
   })).filter(s => s.cats.length > 0);
 
-  const resultCount = searchActive
-    ? searchResults.length
-    : categoryPillActive
-      ? visibleSections.reduce((acc, s) => acc + s.cats.length, 0)
-      : categories.length;
+  const resultCount = searchActive ? searchResults.length : categories.length;
 
   return (
-    <div className="w-full bg-white min-h-screen">
+    <div className="w-full bg-gray-50 min-h-screen">
 
-      {/* ── DARK HEADER ── */}
+      {/* ── Dark banner ── */}
       <section style={{ background: '#111' }}>
-        {/* Banner image */}
         <div className="relative h-44 md:h-52 overflow-hidden">
           <img
             src={ALL_CATEGORIES_BANNER}
@@ -310,145 +430,53 @@ export function AllCategoriesPage() {
             loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-[#111]" />
-          {/* Back button */}
-          <div className="absolute top-4 left-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs text-white/80 border border-white/15 cursor-pointer transition-colors"
-              style={{ fontWeight: 600 }}
-            >
-              <ChevronLeft className="w-4 h-4" /> Back
-            </button>
-          </div>
         </div>
-
-        {/* Info strip */}
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 pb-6">
-          <div className="flex flex-col md:flex-row md:items-end gap-4 mt-6 relative z-10">
-            {/* Title + meta */}
-            <div className="flex-1 pb-1">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h1 className="text-white" style={{ fontSize: '1.5rem', fontWeight: 800 }}>Browse Categories</h1>
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ fontSize: '11px', background: 'rgba(0,151,57,0.2)', color: '#22c55e', border: '1px solid rgba(0,151,57,0.3)', fontWeight: 700 }}>
-                  <Sprout className="w-3 h-3" /> All Departments
-                </span>
-              </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-white" style={{ fontSize: '0.82rem', fontWeight: 700 }}>{categories.length}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>categories</span>
-                </div>
-                <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                <div className="flex items-center gap-1" style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)' }}>
-                  <MapPin className="w-3.5 h-3.5" /> Zimbabwe
-                </div>
-                <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-white" style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)' }}>{products.length}+ products</span>
-                </div>
-              </div>
-              <p className="mt-2" style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.45)', maxWidth: '540px' }}>
-                Explore every department on Msika — from fashion and electronics to food, crafts and property.
-              </p>
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 pb-8">
+          <div className="mt-6">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-white" style={{ fontSize: '1.5rem', fontWeight: 800 }}>Browse Categories</h1>
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ fontSize: '11px', background: 'rgba(0,151,57,0.2)', color: '#22c55e', border: '1px solid rgba(0,151,57,0.3)', fontWeight: 700 }}>
+                <Sprout className="w-3 h-3" /> All Departments
+              </span>
             </div>
-
-            {/* Search */}
-            <div className="relative w-full md:w-64 shrink-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.35)' }} />
-              <input
-                type="text"
-                placeholder="Search categories…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 rounded-xl text-sm focus:outline-none transition-colors"
-                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white' }}
-                onFocus={e => { e.currentTarget.style.border = '1px solid #009739'; }}
-                onBlur={e => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'; }}
-              />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0">
-                  <X className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.4)' }} />
-                </button>
-              )}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-white" style={{ fontSize: '0.82rem', fontWeight: 700 }}>{categories.length}</span>
+              <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>categories</span>
+              <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+              <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)' }}>{products.length}+ products</span>
             </div>
+            <p className="mt-2" style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.45)', maxWidth: '540px' }}>
+              Explore every department on Msika — from fashion and electronics to food, crafts and property.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* ── DARK FILTER BAR ── */}
-      <section className="sticky top-16 z-20 shadow-sm" style={{ background: '#0a0a0a', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="max-w-7xl mx-auto px-4 lg:px-10">
-          <div className="flex items-center gap-2 py-3">
-
-            {/* ← Left scroll arrow */}
-            <button
-              onClick={() => scrollPills('left')}
-              aria-label="Scroll categories left"
-              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)' }}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            {/* Scrollable pills */}
-            <div ref={pillsRef} className="flex items-center gap-2 flex-1 overflow-x-auto scrollbar-hide">
-              {FILTER_PILLS.map(pill => (
-                <button
-                  key={pill.value}
-                  onClick={() => setActiveGroup(pill.value)}
-                  className="shrink-0 px-4 py-1.5 rounded-full cursor-pointer transition-all"
-                  style={{
-                    fontSize: '0.78rem',
-                    fontWeight: activeGroup === pill.value ? 700 : 500,
-                    background: activeGroup === pill.value ? '#009739' : 'rgba(255,255,255,0.06)',
-                    color:      activeGroup === pill.value ? '#fff'    : 'rgba(255,255,255,0.55)',
-                    border:     activeGroup === pill.value ? '1.5px solid #009739' : '1.5px solid rgba(255,255,255,0.1)',
-                    letterSpacing: '0.01em',
-                    whiteSpace: 'nowrap',
-                  }}
-                  aria-pressed={activeGroup === pill.value}
-                >
-                  {pill.label}
-                </button>
-              ))}
-            </div>
-
-            {/* → Right scroll arrow */}
-            <button
-              onClick={() => scrollPills('right')}
-              aria-label="Scroll categories right"
-              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)' }}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            {/* Permanent divider */}
-            <div className="w-px h-5 shrink-0 mx-1" style={{ background: 'rgba(255,255,255,0.12)' }} />
-
-            {(search || activeGroup !== 'all') && (
-              <button
-                onClick={() => { setSearch(''); setActiveGroup('all'); }}
-                className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full cursor-pointer transition-all"
-                style={{ fontSize: '0.75rem', fontWeight: 600, color: '#CE1126', background: 'rgba(206,17,38,0.1)', border: '1.5px solid rgba(206,17,38,0.2)' }}
-              >
-                <X className="w-3 h-3" /> Clear
+      {/* ── Search bar ── */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-3">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search categories..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-8 pr-7 py-1.5 rounded-lg text-sm border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#009739] transition-colors"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0 bg-transparent border-none cursor-pointer">
+                <X className="w-3.5 h-3.5 text-gray-400" />
               </button>
             )}
-
-            {/* Result count */}
-            <div className="ml-auto shrink-0">
-              <span className="text-white" style={{ fontSize: '0.82rem', fontWeight: 700 }}>{resultCount}</span>
-              <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', marginLeft: '4px' }}>categories</span>
-            </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* ── SEARCH RESULTS (shown only when searching) ── */}
       {searchActive && (
-        <section className="border-t border-[#EAEAEA] py-14">
-          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+        <section className="py-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
             <div className="flex items-end justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(0,151,57,0.08)' }}>
@@ -497,10 +525,10 @@ export function AllCategoriesPage() {
       {!searchActive && visibleSections.map((section) => (
           <section
             key={section.id}
-            className="border-t border-[#EAEAEA] py-12"
+            className="border-t border-gray-100 py-10"
             style={{ background: section.bg }}
           >
-            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
               <SectionHeader
                 icon={<span style={{ color: section.iconColor }}>{SECTION_ICONS[section.id]}</span>}
                 iconBg={section.iconBg}
@@ -521,75 +549,12 @@ export function AllCategoriesPage() {
       {/* ── PRODUCT SHELVES ── */}
       {!searchActive && (
         <>
-          {shelfTopRated.length > 0 && (
-            <ProductSection
-              icon={Star}
-              accent="#009739"
-              label="Highest Rated"
-              title={categoryPillActive ? `Top Rated in ${shortCatName}` : 'Top Rated on Msika'}
-              items={shelfTopRated}
-              linkTo={shopLink}
-              navigate={navigate}
-            />
-          )}
-          {shelfBestSellers.length > 0 && (
-            <ProductSection
-              icon={Flame}
-              accent="#CE1126"
-              label="Most Purchased"
-              title={categoryPillActive ? `Best Sellers in ${shortCatName}` : 'Best Sellers'}
-              items={shelfBestSellers}
-              linkTo={shopLink}
-              navigate={navigate}
-              bg="#fafafa"
-            />
-          )}
-          {shelfNewArrivals.length > 0 && (
-            <ProductSection
-              icon={Sparkles}
-              accent="#009739"
-              label="Just Dropped"
-              title={categoryPillActive ? `New in ${shortCatName}` : 'New Arrivals'}
-              items={shelfNewArrivals}
-              linkTo={shopLink}
-              navigate={navigate}
-            />
-          )}
-          {shelfOnSale.length > 0 && (
-            <ProductSection
-              icon={Tag}
-              accent="#CE1126"
-              label="Limited Time"
-              title={categoryPillActive ? `Deals in ${shortCatName}` : 'On Sale'}
-              items={shelfOnSale}
-              linkTo={shopLink}
-              navigate={navigate}
-              bg="#fafafa"
-            />
-          )}
-          {shelfTrending.length > 0 && (
-            <ProductSection
-              icon={TrendingUp}
-              accent="#b8930a"
-              label="Popular Right Now"
-              title={categoryPillActive ? `Trending in ${shortCatName}` : 'Trending Now'}
-              items={shelfTrending}
-              linkTo={shopLink}
-              navigate={navigate}
-            />
-          )}
-          {shelfBudget.length > 0 && (
-            <ProductSection
-              icon={Zap}
-              accent="#009739"
-              label="Under $20"
-              title={categoryPillActive ? `Budget ${shortCatName}` : 'Budget Picks'}
-              items={shelfBudget}
-              linkTo={shopLink}
-              navigate={navigate}
-              bg="#fafafa"
-            />
-          )}
+          {shelfTopRated.length > 0    && <ProductSection icon={Star}      accent="#009739" label="Highest Rated"    title="Top Rated on Msika" items={shelfTopRated}    linkTo="/shop" navigate={navigate} />}
+          {shelfBestSellers.length > 0 && <ProductSection icon={Flame}     accent="#CE1126" label="Most Purchased"   title="Best Sellers"       items={shelfBestSellers} linkTo="/shop" navigate={navigate} bg="#fafafa" />}
+          {shelfNewArrivals.length > 0  && <ProductSection icon={Sparkles}  accent="#009739" label="Just Dropped"     title="New Arrivals"        items={shelfNewArrivals} linkTo="/shop" navigate={navigate} />}
+          {shelfOnSale.length > 0       && <ProductSection icon={Tag}       accent="#CE1126" label="Limited Time"     title="On Sale"             items={shelfOnSale}      linkTo="/shop" navigate={navigate} bg="#fafafa" />}
+          {shelfTrending.length > 0     && <ProductSection icon={TrendingUp} accent="#b8930a" label="Popular Right Now" title="Trending Now"       items={shelfTrending}    linkTo="/shop" navigate={navigate} />}
+          {shelfBudget.length > 0       && <ProductSection icon={Zap}       accent="#009739" label="Under $20"        title="Budget Picks"        items={shelfBudget}      linkTo="/shop" navigate={navigate} bg="#fafafa" />}
         </>
       )}
 

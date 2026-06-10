@@ -21,7 +21,7 @@ const SHOP_SORT_OPTIONS = [
 function SpotlightCard({
   seller, badge, accentColor,
 }: {
-  seller: { id: string; name: string; banner: string; logo: string; verified: boolean; location: string; rating: number; reviewCount: number; productCount: number; category: string };
+  seller: { id: string; name: string; banner: string; logo: string; verified: boolean; location: string; rating: number; reviewCount: number; productCount: number; category: string; joined?: string };
   badge: string;
   accentColor: string;
 }) {

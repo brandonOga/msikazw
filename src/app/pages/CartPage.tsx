@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { Link, useNavigate } from 'react-router';
 import { useStore } from '../context/StoreContext';
 import {
@@ -177,6 +178,8 @@ export const CartPage = () => {
   return (
     <div className="w-full bg-white min-h-screen pb-24 md:pb-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <Breadcrumbs className="mb-6" crumbs={[{ label: 'Cart' }]} />
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

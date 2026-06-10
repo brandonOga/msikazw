@@ -350,3 +350,46 @@ create trigger set_sellers_updated_at    before update on public.sellers    for 
 create trigger set_products_updated_at   before update on public.products   for each row execute procedure public.set_updated_at();
 create trigger set_orders_updated_at     before update on public.orders     for each row execute procedure public.set_updated_at();
 create trigger set_disputes_updated_at   before update on public.disputes   for each row execute procedure public.set_updated_at();
+
+-- ── Migration: shipment tracking columns ──────────────────────────────────────
+-- Run after initial schema setup if upgrading an existing database
+alter table public.orders
+  add column if not exists shipment_id     text,
+  add column if not exists shipment_status text;
+
+-- ── Migration: seller review notes ───────────────────────────────────────────
+alter table public.sellers
+  add column if not exists review_notes text;
+
+-- ── Migration: dispute resolution column ─────────────────────────────────────
+alter table public.disputes
+  add column if not exists resolution text;
+
+-- ── Seller order access policies ─────────────────────────────────────────────
+-- Allow sellers to view order_items for their own products
+create policy "Seller can view order items for their products"
+  on public.order_items for select using (
+    exists (
+      select 1 from public.products p
+      join public.sellers s on s.id = p.seller_id
+      where p.id = product_id and s.user_id = auth.uid()
+    )
+  );
+
+-- Allow sellers to view orders that contain their products
+create policy "Seller can view orders containing their products"
+  on public.orders for select using (
+    buyer_id = auth.uid()
+    or exists (
+      select 1 from public.order_items oi
+      join public.products p on p.id = oi.product_id
+      join public.sellers s on s.id = p.seller_id
+      where oi.order_id = id and s.user_id = auth.uid()
+    )
+  );
+
+-- ── Admin bootstrap ───────────────────────────────────────────────────────────
+-- To grant admin role to a user, run:
+--   update public.profiles set role = 'admin' where id = '<user-uuid>';
+-- Replace <user-uuid> with the UUID from Supabase Auth → Users dashboard.
+-- Only do this for trusted users — admin role grants full dashboard access.

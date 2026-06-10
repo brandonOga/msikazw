@@ -1,33 +1,31 @@
-import React from 'react';
-import { Heart, ShieldCheck, Zap, ShoppingCart, Truck, TrendingUp, Flame, Clock } from 'lucide-react';
-import { Product, sellers, getSmartBadge, getDeliveryEstimate, getDealEndTime, getBoughtTodayCount } from '../data/mockData';
+import React, { useRef, useState } from 'react';
+import { Heart, ShoppingBasket, Star } from 'lucide-react';
+import { Product, sellers, getSmartBadge, isProductNew } from '../data/mockData';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router';
-import { StarRating } from './StarRating';
 
 interface ProductCardProps {
   product: Product;
   showQuickAdd?: boolean;
 }
 
-const DISPLAY_FONT: React.CSSProperties = {
-  fontFamily: "'Barlow Condensed', 'Inter', sans-serif",
-  textTransform: 'uppercase',
-  letterSpacing: '-0.01em',
-};
 
 export function ProductCard({ product, showQuickAdd = true }: ProductCardProps) {
   const { addToCart, toggleWishlist, isWishlisted, formatPrice } = useStore();
   const navigate = useNavigate();
   const wishlisted = isWishlisted(product.id);
-  const sellerVerified = sellers.find(s => s.id === product.sellerId)?.verified;
   const smartBadge = getSmartBadge(product);
-  const deliveryEst = getDeliveryEstimate(product.deliveryBadge);
+  const sellerVerified = sellers.find(s => s.id === product.sellerId)?.verified;
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
-  const dealEndTime = product.isDeal ? getDealEndTime(product.id) : null;
-  const boughtToday = getBoughtTodayCount(product.id);
+  const allImages = product.images && product.images.length > 0 ? product.images : [product.image];
+  const [activeIdx, setActiveIdx] = useState(0);
+  const dragStartX = useRef<number | null>(null);
+  const isDragging = useRef(false);
+
+  const productIsNew = isProductNew(product);
+  const badgeLabel = productIsNew ? 'New' : smartBadge?.label ?? null;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -39,146 +37,159 @@ export function ProductCard({ product, showQuickAdd = true }: ProductCardProps) 
     toggleWishlist(product.id);
   };
 
+  const goTo = (idx: number) => setActiveIdx((idx + allImages.length) % allImages.length);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    dragStartX.current = e.clientX;
+    isDragging.current = false;
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (dragStartX.current !== null && Math.abs(e.clientX - dragStartX.current) > 5) {
+      isDragging.current = true;
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (dragStartX.current === null) return;
+    const delta = e.clientX - dragStartX.current;
+    if (Math.abs(delta) > 40) {
+      goTo(activeIdx + (delta < 0 ? 1 : -1));
+    } else if (!isDragging.current) {
+      navigate(`/product/${product.id}`);
+    }
+    dragStartX.current = null;
+    isDragging.current = false;
+  };
+
   return (
-    <article
-      className="w-full aspect-[4/3] sm:aspect-[3/4]"
-      style={{ position: 'relative' }}
-      aria-label={`${product.name} — ${formatPrice(product.price)}`}
-    >
+    <article className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+      {/* Image area */}
       <div
-        onClick={() => navigate(`/product/${product.id}`)}
-        className="absolute inset-0 w-full h-full overflow-hidden rounded-2xl text-left group cursor-pointer"
+        className="relative bg-gray-100 overflow-hidden select-none"
+        style={{ paddingBottom: '75%', cursor: 'pointer' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
       >
-        {/* Product image */}
-        <img
-          src={product.image}
-          alt={product.name}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          loading="lazy"
-        />
-
-        {/* Gradient overlay */}
+        {/* Slides */}
         <div
-          className="absolute inset-0"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.75) 35%, rgba(0,0,0,0.15) 60%, rgba(0,0,0,0.02) 80%)' }}
-        />
-
-        {/* Top-left badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-          {product.isNew && (
-            <span
-              className="px-2 py-0.5 rounded-full text-white"
-              style={{ background: 'rgba(0,151,57,0.85)', backdropFilter: 'blur(8px)', fontSize: '0.65rem', fontWeight: 700 }}
-            >
-              New
-            </span>
-          )}
-          {smartBadge && !product.isNew && (
-            <span
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-white"
-              style={{ background: smartBadge.color === '#CE1126' ? 'rgba(206,17,38,0.88)' : 'rgba(0,151,57,0.85)', backdropFilter: 'blur(8px)', fontSize: '0.65rem', fontWeight: 700 }}
-            >
-              {smartBadge.label.includes('Best') && <TrendingUp className="w-2.5 h-2.5" />}
-              {smartBadge.label.includes('Hot') && <Flame className="w-2.5 h-2.5" />}
-              {smartBadge.label}
-            </span>
-          )}
-          {discount > 0 && (
-            <span
-              className="px-2 py-0.5 rounded-full text-white"
-              style={{ background: 'rgba(206,17,38,0.88)', backdropFilter: 'blur(8px)', fontSize: '0.65rem', fontWeight: 700 }}
-            >
-              -{discount}%
-            </span>
-          )}
+          className="absolute top-0 left-0 bottom-0 flex transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(-${activeIdx * 100 / allImages.length}%)`, width: `${allImages.length * 100}%` }}
+        >
+          {allImages.map((src, i) => (
+            <div key={i} className="relative flex-shrink-0" style={{ width: `${100 / allImages.length}%` }}>
+              <img
+                src={src}
+                alt={`${product.name} ${i + 1}`}
+                className="absolute inset-0 w-full h-full object-contain p-4"
+                loading="lazy"
+                draggable={false}
+              />
+            </div>
+          ))}
         </div>
 
-        {/* Top-right: wishlist */}
+        {/* Badge top-left */}
+        {badgeLabel && (
+          <span className="absolute top-3 left-3 bg-white text-gray-900 text-xs font-semibold px-3 py-1 rounded-full shadow-sm z-10">
+            {badgeLabel}
+          </span>
+        )}
+
+        {/* Wishlist top-right */}
         <button
+          onPointerDown={e => e.stopPropagation()}
           onClick={handleToggleWish}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center z-10 transition-transform active:scale-90"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center transition-transform active:scale-90 hover:shadow-md z-10"
           aria-label={wishlisted ? 'Remove from wishlist' : 'Save to wishlist'}
-          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}
         >
-          <Heart className="w-4 h-4" fill="none" color={wishlisted ? '#CE1126' : 'rgba(255,255,255,0.8)'} strokeWidth={2} />
+          <Heart
+            className="w-4 h-4"
+            fill={wishlisted ? '#CE1126' : 'none'}
+            stroke={wishlisted ? '#CE1126' : '#374151'}
+            strokeWidth={2}
+          />
         </button>
 
-        {/* Bottom content — pinned */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 flex flex-col items-start z-10">
-          {/* Seller + delivery row */}
-          <div className="flex items-center justify-between w-full mb-1">
-            <div className="flex items-center gap-1">
-              <span className="text-white/50 truncate" style={{ fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', maxWidth: '50%' }}>
-                {product.sellerName}
-              </span>
-              {sellerVerified && <ShieldCheck className="w-3 h-3 shrink-0" style={{ color: '#009739' }} />}
-              {product.isDeal && <Zap className="w-3 h-3 shrink-0" style={{ color: '#CE1126' }} />}
-            </div>
-            <span className="inline-flex items-center gap-1 text-white/60 shrink-0" style={{ fontSize: '0.6rem', fontWeight: 600 }}>
-              <Truck className="w-2.5 h-2.5" /> {deliveryEst}
-            </span>
-          </div>
-
-          {/* Product name — single line clamp for consistency */}
-          <h3
-            className="text-white line-clamp-1 mb-2 w-full"
-            style={{ ...DISPLAY_FONT, fontSize: 'clamp(1rem, 2vw, 1.3rem)', fontWeight: 900, lineHeight: 1.05 }}
-          >
-            {product.name}
-          </h3>
-
-          {/* Price */}
-          <div className="flex items-baseline gap-1.5 mb-1">
-            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#FFD100' }}>
-              {formatPrice(product.price)}
-            </span>
-            {product.originalPrice && (
-              <span className="text-white/40 line-through" style={{ fontSize: '0.72rem' }}>
-                {formatPrice(product.originalPrice)}
-              </span>
-            )}
-          </div>
-
-          {/* Deal countdown + sold count */}
-          <div className="flex items-center gap-2 mb-2 w-full">
-            {dealEndTime && (
-              <span className="inline-flex items-center gap-1 text-white/70" style={{ fontSize: '0.6rem', fontWeight: 700 }}>
-                <Clock className="w-2.5 h-2.5" style={{ color: '#CE1126' }} />
-                {dealEndTime.hours}h {dealEndTime.minutes}m left
-              </span>
-            )}
-            <span className="text-white/40" style={{ fontSize: '0.6rem', fontWeight: 600 }}>
-              {boughtToday}+ sold today
-            </span>
-          </div>
-
-          {/* Rating + Add to cart row */}
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-1">
-              <StarRating size={11} />
-              <span className="text-white/80" style={{ fontSize: '0.72rem', fontWeight: 600 }}>{product.rating}</span>
-              <span className="text-white/40" style={{ fontSize: '0.68rem' }}>({product.reviewCount})</span>
-            </div>
-            {showQuickAdd && (
+        {/* Carousel dots */}
+        {allImages.length > 1 && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
+            {allImages.map((_, i) => (
               <button
-                onClick={handleAddToCart}
-                className="inline-flex items-center gap-1 text-white transition-all duration-300 hover:bg-[#009739] hover:border-[#009739]"
-                aria-label={`Add ${product.name} to cart`}
+                key={i}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); goTo(i); }}
+                className="transition-all duration-200"
                 style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  background: 'rgba(20,20,20,0.75)',
-                  border: '1px solid rgba(255,255,255,0.22)',
-                  backdropFilter: 'blur(8px)',
-                  borderRadius: '8px',
-                  padding: '5px 10px',
+                  width: i === activeIdx ? '16px' : '6px',
+                  height: '6px',
+                  borderRadius: '9999px',
+                  background: i === activeIdx ? '#111827' : '#D1D5DB',
+                  border: 'none',
+                  padding: 0,
                 }}
-              >
-                <ShoppingCart className="w-3 h-3" /> Add
-              </button>
-            )}
+              />
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* Card body */}
+      <div className="flex flex-col gap-2 p-4">
+        {/* Name */}
+        <h3
+          className="font-bold text-gray-900 text-base leading-tight line-clamp-1 cursor-pointer hover:text-[#009739] transition-colors"
+          onClick={() => navigate(`/product/${product.id}`)}
+        >
+          {product.name}
+        </h3>
+
+        {/* Category · rating */}
+        <div className="flex items-center gap-1 text-sm text-gray-500 flex-wrap">
+          <span>{product.category}</span>
+          {product.reviewCount > 0 && (
+            <>
+              <span>·</span>
+              <span className="flex items-center gap-0.5">
+                <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
+                <span className="text-gray-700 font-medium">{product.rating}</span>
+              </span>
+              <span className="text-gray-400 text-xs">{product.reviewCount.toLocaleString()} reviews</span>
+            </>
+          )}
         </div>
+
+        {/* Price row */}
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-gray-900 font-bold text-base">{formatPrice(product.price)}</span>
+          {product.originalPrice && (
+            <>
+              <span className="text-gray-400 line-through text-sm">{formatPrice(product.originalPrice)}</span>
+              <span className="text-[#009739] font-semibold text-sm">{discount}% off</span>
+            </>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        {showQuickAdd && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 mt-1">
+            <button
+              onClick={() => navigate(`/product/${product.id}`)}
+              className="flex-1 py-2 px-3 rounded-full border border-gray-200 text-gray-800 text-xs font-medium hover:border-gray-400 transition-colors whitespace-nowrap"
+            >
+              View Details
+            </button>
+            <button
+              onClick={handleAddToCart}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-[#009739] transition-colors whitespace-nowrap"
+              aria-label={`Add ${product.name} to cart`}
+            >
+              <ShoppingBasket className="w-3.5 h-3.5" />
+              Add to Cart
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );

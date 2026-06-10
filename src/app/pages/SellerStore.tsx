@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useProducts, useSellers } from '../../lib/hooks/useProducts';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import {
   Star, CheckCircle, ChevronLeft, ChevronRight, ChevronDown,
   Search, X, SlidersHorizontal, ArrowRight, MapPin, Clock,
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react';
 import { ProductCard } from '../components/ProductCard';
 import { StarRating } from '../components/StarRating';
+import { products } from '../data/mockData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ShopReview {
@@ -100,7 +102,7 @@ const PRICE_OPTIONS = [
 ];
 
 // ── Inline shop card — matches "Top Rated on Msika" card style ────────────────
-function ShopCard({ s }: { s: { id: string; name: string; logo: string; banner: string; rating: number; reviewCount: number; verified: boolean; location: string; category: string; productCount: number } }) {
+function ShopCard({ s }: { s: { id: string; name: string; logo: string; banner: string; rating: number; reviewCount: number; verified: boolean; location: string; category: string; productCount: number; joined?: string } }) {
   const navigate = useNavigate();
   const productCount = s.productCount;
   return (
@@ -291,6 +293,14 @@ export function SellerStore() {
 
   return (
     <div className="bg-white min-h-screen">
+
+      {/* Breadcrumb */}
+      <div className="px-4 sm:px-6 lg:px-10 py-3 border-b border-gray-100">
+        <Breadcrumbs crumbs={[
+          { label: 'Shops', href: '/shops' },
+          { label: seller.name },
+        ]} />
+      </div>
 
       {/* ════════════════════════════════════════════════════════════════
           1. DARK HEADER

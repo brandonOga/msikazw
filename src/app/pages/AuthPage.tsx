@@ -270,6 +270,11 @@ export const AuthPage = () => {
                 </button>
               </div>
               <FieldError msg={errors.password} />
+              <div className="text-right mt-1">
+                <a href="/forgot-password" className="text-xs text-[#009739] hover:underline" style={{ fontWeight: 600 }}>
+                  Forgot password?
+                </a>
+              </div>
             </div>
           </div>
 

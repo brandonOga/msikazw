@@ -12,6 +12,7 @@ import {
   Dispute, DisputeStatus,
 } from '../data/mockData';
 import * as adminDb from '../../lib/db/admin';
+import type { PlatformStats } from '../../lib/db/admin';
 import { isSupabaseConfigured } from '../../lib/supabase';
 
 type AdminView = 'dashboard' | 'pending-sellers' | 'disputes';
@@ -28,6 +29,7 @@ export const AdminDashboard = () => {
   const { user, authLoading } = useStore();
   const [applications, setApplications] = useState<SellerApplicationData[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,9 +45,11 @@ export const AdminDashboard = () => {
     Promise.all([
       adminDb.fetchSellerApplications(),
       adminDb.fetchDisputes(),
-    ]).then(([apps, disp]) => {
+      adminDb.fetchPlatformStats(),
+    ]).then(([apps, disp, stats]) => {
       if (apps.length > 0) setApplications(apps);
       if (disp.length > 0) setDisputes(disp);
+      setPlatformStats(stats);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -201,9 +205,9 @@ export const AdminDashboard = () => {
             <h2 className="text-gray-900 mb-6" style={{ fontSize: '1.4rem', fontWeight: 800 }}>Dashboard Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
               {[
-                { label: 'Total Applications', value: stats.total, icon: Users, color: '#009739' },
-                { label: 'Pending Review', value: stats.pending, icon: Clock, color: '#FFD100' },
-                { label: 'Approved Sellers', value: stats.approved, icon: CheckCircle, color: '#009739' },
+                { label: 'Platform Revenue', value: platformStats ? `$${platformStats.totalRevenue.toFixed(0)}` : String(stats.total), icon: Users, color: '#009739' },
+                { label: 'Total Orders', value: platformStats ? String(platformStats.totalOrders) : String(stats.pending), icon: Clock, color: '#856404' },
+                { label: 'Approved Sellers', value: platformStats ? String(platformStats.approvedSellers) : String(stats.approved), icon: CheckCircle, color: '#009739' },
                 { label: 'Open Disputes', value: stats.openDisputes, icon: Shield, color: '#CE1126' },
               ].map(s => (
                 <div key={s.label} className="p-5 rounded-xl border border-[#EAEAEA]" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>

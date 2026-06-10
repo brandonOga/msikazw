@@ -9,12 +9,14 @@ interface UseProductsOptions {
   sellerId?: string;   // Supabase UUID or legacy mock ID (s1, s2…)
   search?: string;
   limit?: number;
+  page?: number;       // 0-based page index (used with limit for pagination)
 }
 
 interface UseProductsResult {
   products: Product[];
   loading: boolean;
   error: string | null;
+  hasMore: boolean;
   refresh: () => void;
 }
 
@@ -26,10 +28,13 @@ interface UseSellersResult {
 
 // ── useProducts ───────────────────────────────────────────────────────────────
 
+const DEFAULT_PAGE_SIZE = 24;
+
 export function useProducts(options: UseProductsOptions = {}): UseProductsResult {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
+  const [hasMore, setHasMore]   = useState(false);
   const [tick, setTick]         = useState(0);
 
   const refresh = () => setTick(t => t + 1);
@@ -47,21 +52,30 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
       }
 
       try {
+        const pageSize = options.limit ?? DEFAULT_PAGE_SIZE;
+        const page = options.page ?? 0;
+        const from = page * pageSize;
+        const to   = from + pageSize - 1;
+
         let query = supabase
           .from('products')
-          .select('*, sellers(business_name)')
-          .eq('in_stock', true);
+          .select('*, sellers(business_name)', { count: 'exact' })
+          .eq('in_stock', true)
+          .range(from, to);
 
         if (options.category) query = query.eq('category', options.category);
         if (options.search)   query = query.ilike('name', `%${options.search}%`);
-        if (options.limit)    query = query.limit(options.limit);
 
-        const { data, error: err } = await query;
+        const { data, error: err, count } = await query;
 
         if (err) throw err;
 
         const mapped = (data || []).map(dbRowToProduct);
-        if (!cancelled) { setProducts(mapped); setLoading(false); }
+        if (!cancelled) {
+          setProducts(mapped);
+          setHasMore((count ?? 0) > to + 1);
+          setLoading(false);
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to load products';
         console.error('[useProducts]', msg);
@@ -72,9 +86,9 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
     load();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options.category, options.search, options.sellerId, options.limit, tick]);
+  }, [options.category, options.search, options.sellerId, options.limit, options.page, tick]);
 
-  return { products, loading, error, refresh };
+  return { products, loading, error, hasMore, refresh };
 }
 
 // ── useProductById ────────────────────────────────────────────────────────────

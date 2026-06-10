@@ -83,6 +83,20 @@ export async function verifyEmailOtp(
   return { error: error ? error.message : null };
 }
 
+export async function requestPasswordReset(email: string): Promise<{ error: string | null }> {
+  if (!isSupabaseConfigured) return { error: 'Supabase not configured' };
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  return { error: error ? error.message : null };
+}
+
+export async function updatePassword(newPassword: string): Promise<{ error: string | null }> {
+  if (!isSupabaseConfigured) return { error: 'Supabase not configured' };
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  return { error: error ? error.message : null };
+}
+
 export async function updateProfile(userId: string, updates: { name?: string; phone?: string; location?: string }) {
   if (!isSupabaseConfigured) return null;
 

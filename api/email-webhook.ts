@@ -22,8 +22,19 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // Process event: e.g., bounce, complaint, or inbound email
-  console.log('Email webhook received:', event)
+  const eventType: string = event?.event || event?.type || ''
+  console.log('Email webhook received:', eventType, event)
+
+  // Handle SendGrid event types
+  if (eventType === 'bounce' || eventType === 'blocked') {
+    const email: string = event?.email || ''
+    console.warn(`[email-webhook] Bounce/block for ${email}:`, event?.reason || event?.status)
+    // TODO: record bounced address in DB to suppress future sends
+  } else if (eventType === 'spamreport' || eventType === 'unsubscribe') {
+    const email: string = event?.email || ''
+    console.warn(`[email-webhook] Unsubscribe/spam report for ${email}`)
+    // TODO: record unsubscribe in DB and honour in sendTransactionalEmail
+  }
 
   res.status(200).json({ received: true })
 }

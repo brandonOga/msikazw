@@ -1,5 +1,5 @@
 export async function initSentry() {
-  const dsn = process.env.SENTRY_DSN
+  const dsn = import.meta.env.VITE_SENTRY_DSN
   if (!dsn) {
     console.warn('Sentry DSN not configured — skipping init')
     return

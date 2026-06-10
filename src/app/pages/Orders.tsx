@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import {
   Package, ChevronRight, ShieldCheck, Star, X, Loader2,
   CheckCircle2, Clock, MapPin, Truck,
@@ -423,6 +424,8 @@ export function Orders() {
   return (
     <div className="bg-white min-h-screen">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+
+        <Breadcrumbs className="mb-6" crumbs={[{ label: 'My Orders' }]} />
 
         {/* Page header */}
         <div className="flex items-center justify-between mb-6">

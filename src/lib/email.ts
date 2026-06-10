@@ -1,6 +1,6 @@
 export async function sendTransactionalEmail({ to, subject, html, text }: { to: string; subject: string; html?: string; text?: string }) {
-  const apiKey = process.env.SENDGRID_API_KEY
-  const from = process.env.SENDGRID_FROM
+  const apiKey = import.meta.env.VITE_SENDGRID_API_KEY
+  const from = import.meta.env.VITE_SENDGRID_FROM
   if (!apiKey || !from) throw new Error('SendGrid not configured')
 
   const res = await fetch('https://api.sendgrid.com/v3/mail/send', {

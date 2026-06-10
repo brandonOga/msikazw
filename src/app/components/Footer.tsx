@@ -63,6 +63,10 @@ export const Footer = () => {
           <div className="flex items-center gap-4 text-xs text-gray-400">
             <Link to="/trust-center" className="hover:text-[#009739] transition-colors">Trust & Safety</Link>
             <span>&middot;</span>
+            <Link to="/terms" className="hover:text-[#009739] transition-colors">Terms</Link>
+            <span>&middot;</span>
+            <Link to="/privacy" className="hover:text-[#009739] transition-colors">Privacy</Link>
+            <span>&middot;</span>
             <span>Made in Zimbabwe</span>
           </div>
         </div>

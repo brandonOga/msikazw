@@ -1,5 +1,70 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
-import type { PlacedOrder } from '../../app/context/StoreContext';
+import type { PlacedOrder, EscrowStatus } from '../../app/context/StoreContext';
+
+// ── Seller-side order model ───────────────────────────────────────────────────
+export interface SellerOrderItem {
+  id: string;           // order_items.id
+  orderId: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  buyerName: string;
+  buyerPhone: string;
+  quantity: number;
+  price: number;
+  deliveryMethod: string;
+  trackingNumber?: string;
+  deliveryPartner?: string;
+  escrowStatus: EscrowStatus;
+  date: string;
+  address?: string;
+}
+
+export async function fetchSellerOrders(sellerId: string): Promise<SellerOrderItem[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const { data, error } = await supabase
+    .from('order_items')
+    .select(`
+      id,
+      order_id,
+      product_id,
+      product_name,
+      product_image,
+      price,
+      quantity,
+      orders (
+        id, escrow_status, delivery_method, delivery_partner,
+        tracking_number, name, phone, address, date
+      ),
+      products!inner ( seller_id )
+    `)
+    .eq('products.seller_id', sellerId)
+    .order('id', { ascending: false });
+
+  if (error) { console.error('[orders] fetchSellerOrders:', error); return []; }
+
+  return (data || []).map(row => {
+    const o = (row.orders as unknown as Record<string, unknown>) || {};
+    return {
+      id: row.id as string,
+      orderId: row.order_id as string,
+      productId: row.product_id as string,
+      productName: row.product_name as string,
+      productImage: (row.product_image as string) || '',
+      price: Number(row.price),
+      quantity: Number(row.quantity),
+      buyerName: (o.name as string) || 'Customer',
+      buyerPhone: (o.phone as string) || '',
+      address: o.address as string | undefined,
+      escrowStatus: ((o.escrow_status as EscrowStatus) || 'awaiting_payment'),
+      deliveryMethod: (o.delivery_method as string) || '',
+      deliveryPartner: o.delivery_partner as string | undefined,
+      trackingNumber: o.tracking_number as string | undefined,
+      date: new Date(o.date as string).toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }),
+    };
+  });
+}
 
 export async function fetchOrders(userId: string): Promise<PlacedOrder[]> {
   if (!isSupabaseConfigured) return [];

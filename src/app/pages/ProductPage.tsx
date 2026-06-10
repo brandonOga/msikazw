@@ -1,19 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import {
-  getSellerById, getProductsBySeller,
-  getFrequentlyBoughtTogether, getSimilarProducts, getCustomersAlsoBought,
-  getStockLeft, getViewingCount, getRecentPurchaseCount,
-  getDeliveryEstimate, getSmartBadge, products,
-  getDealEndTime, getBoughtTodayCount,
-} from '../data/mockData';
+import { Breadcrumbs } from '../components/Breadcrumbs';
+import { getDeliveryEstimate, getSmartBadge } from '../data/mockData';
 import { useProductById } from '../../lib/hooks/useProducts';
 import { useStore } from '../context/StoreContext';
 import {
   Star, Truck, Plus, Minus, ShoppingBag, Heart, CheckCircle, Clock,
-  Shield, Share2, Eye, Users, TrendingUp, Flame,
-  Package, CreditCard, Zap, ChevronRight,
-  FileText, DollarSign, Loader2, X, Bell,
+  Shield, Share2, Package, CreditCard, Zap, ChevronRight, ChevronLeft,
+  FileText, DollarSign, Loader2, X, Bell, Flame, TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProductCard } from '../components/ProductCard';
@@ -43,6 +37,7 @@ export const ProductPage = () => {
   const { addToCart, toggleWishlist, isWishlisted, formatPrice, addToRecentlyViewed, recentlyViewed, openCart, addQuotation, addPreOrder, user, isBackInStockNotified, toggleBackInStock, addReview, getProductReviews, hasUserReviewed } = useStore();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
+  const galleryDragStart = useRef<number | null>(null);
   const [showStickyBar, setShowStickyBar] = useState(false);
   const [showQuotationModal, setShowQuotationModal] = useState(false);
   const [showPreOrderModal, setShowPreOrderModal] = useState(false);
@@ -55,17 +50,6 @@ export const ProductPage = () => {
 
   // Fetch product from Supabase (falls back to mock data automatically)
   const { product, loading: productLoading } = useProductById(id || '');
-  const seller = product ? getSellerById(product.sellerId) : undefined;
-  const relatedProducts = product ? getProductsBySeller(product.sellerId).filter(p => p.id !== product.id) : [];
-  const frequentlyBought = product ? getFrequentlyBoughtTogether(product.id) : [];
-  const similarProducts = product ? getSimilarProducts(product.id) : [];
-  const alsoB = product ? getCustomersAlsoBought(product.id) : [];
-
-  // Recently viewed products (excluding current)
-  const recentlyViewedProducts = recentlyViewed
-    .filter(pid => pid !== id)
-    .map(pid => products.find(p => p.id === pid))
-    .filter(Boolean) as typeof products;
 
   // Track recently viewed
   useEffect(() => {
@@ -104,13 +88,8 @@ export const ProductPage = () => {
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
-  const stockLeft = getStockLeft(product.id);
-  const viewingCount = getViewingCount(product.id);
-  const recentPurchases = getRecentPurchaseCount(product.id);
   const deliveryEst = getDeliveryEstimate(product.deliveryBadge);
   const smartBadge = getSmartBadge(product);
-  const dealEndTime = getDealEndTime(product.id);
-  const boughtTodayCount = getBoughtTodayCount(product.id);
 
   const handleAddToCart = () => {
     const variants = CATEGORY_VARIANTS[product.category];
@@ -140,14 +119,6 @@ export const ProductPage = () => {
     toast.success('Link copied!', { description: 'Product link copied to clipboard.' });
   };
 
-  const handleWhatsApp = () => {
-    if (!seller) return;
-    const msg = encodeURIComponent(`Hi! I'm interested in *${product.name}* ($${product.price}) on Msika. Is it available?`);
-    window.open(`https://wa.me/${seller.whatsapp.replace(/\D/g, '')}?text=${msg}`, '_blank');
-  };
-
-  const bundleTotal = frequentlyBought.reduce((s, p) => s + p.price, product.price);
-
   // -- Section header helper --
   const SectionHeader = ({ overline, title, viewAllTo }: { overline: string; title: string; viewAllTo?: string }) => (
     <div className="flex items-end justify-between mb-6">
@@ -167,60 +138,129 @@ export const ProductPage = () => {
     <div className="w-full bg-white min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 mb-6 text-sm" aria-label="Breadcrumb">
-          <button onClick={() => navigate('/')} className="text-[#009739] hover:underline bg-transparent border-none cursor-pointer p-0">Home</button>
-          <span className="text-gray-300">/</span>
-          <button onClick={() => navigate('/shop')} className="text-[#009739] hover:underline bg-transparent border-none cursor-pointer p-0">Shop</button>
-          <span className="text-gray-300">/</span>
-          <span className="text-gray-500 truncate max-w-[200px]">{product.name}</span>
-        </nav>
+        <Breadcrumbs
+          className="mb-6"
+          crumbs={[
+            { label: 'Shop', href: '/shop' },
+            { label: product.category, href: `/categories?cat=${encodeURIComponent(product.category)}` },
+            { label: product.name },
+          ]}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-16">
           {/* ─── Images ─── */}
           <div>
-            <div className="relative rounded-xl overflow-hidden bg-gray-100 mb-3" style={{ aspectRatio: '4/3' }}>
-              <img
-                src={product.images[activeImage] || product.image}
-                alt={product.name}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-              {/* Badges */}
-              <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-                {discount > 0 && (
-                  <span className="bg-[#CE1126] text-white text-xs px-2.5 py-1 rounded-lg" style={{ fontWeight: 700 }}>
-                    -{discount}%
-                  </span>
-                )}
-                {product.isNew && (
-                  <span className="bg-[#009739] text-white text-xs px-2.5 py-1 rounded-lg" style={{ fontWeight: 700 }}>
-                    New
-                  </span>
-                )}
-                {smartBadge && !product.isNew && (
-                  <span className="text-white text-xs px-2.5 py-1 rounded-lg inline-flex items-center gap-1" style={{ fontWeight: 700, background: smartBadge.color }}>
-                    {smartBadge.label.includes('Best') && <TrendingUp className="w-3 h-3" />}
-                    {smartBadge.label.includes('Hot') && <Flame className="w-3 h-3" />}
-                    {smartBadge.label}
-                  </span>
-                )}
-              </div>
-            </div>
-            {product.images.length > 1 && (
-              <div className="flex gap-2 mb-5">
-                {product.images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveImage(idx)}
-                    className="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100 p-0"
-                    style={{ border: `2px solid ${activeImage === idx ? '#009739' : '#e5e5e5'}` }}
+            {(() => {
+              const allImages = product.images && product.images.length > 0 ? product.images : [product.image];
+              const goTo = (idx: number) => setActiveImage((idx + allImages.length) % allImages.length);
+              return (
+                <>
+                  {/* Main image with swipe */}
+                  <div
+                    className="relative rounded-2xl overflow-hidden bg-gray-100 mb-3 select-none"
+                    style={{ aspectRatio: '4/3' }}
+                    onPointerDown={e => { galleryDragStart.current = e.clientX; }}
+                    onPointerUp={e => {
+                      if (galleryDragStart.current === null) return;
+                      const delta = e.clientX - galleryDragStart.current;
+                      if (Math.abs(delta) > 40) goTo(activeImage + (delta < 0 ? 1 : -1));
+                      galleryDragStart.current = null;
+                    }}
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
-                  </button>
-                ))}
-              </div>
-            )}
+                    {/* Slides strip */}
+                    <div
+                      className="absolute top-0 left-0 bottom-0 flex transition-transform duration-300 ease-out"
+                      style={{ transform: `translateX(-${activeImage * 100 / allImages.length}%)`, width: `${allImages.length * 100}%` }}
+                    >
+                      {allImages.map((src, i) => (
+                        <div key={i} className="relative flex-shrink-0" style={{ width: `${100 / allImages.length}%` }}>
+                          <img
+                            src={src}
+                            alt={`${product.name} ${i + 1}`}
+                            className="absolute inset-0 w-full h-full object-contain p-6"
+                            loading="lazy"
+                            draggable={false}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Badges */}
+                    <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+                      {discount > 0 && (
+                        <span className="bg-[#CE1126] text-white text-xs px-2.5 py-1 rounded-lg" style={{ fontWeight: 700 }}>
+                          -{discount}%
+                        </span>
+                      )}
+                      {product.isNew && (
+                        <span className="bg-[#009739] text-white text-xs px-2.5 py-1 rounded-lg" style={{ fontWeight: 700 }}>
+                          New
+                        </span>
+                      )}
+                      {smartBadge && !product.isNew && (
+                        <span className="text-white text-xs px-2.5 py-1 rounded-lg inline-flex items-center gap-1" style={{ fontWeight: 700, background: smartBadge.color }}>
+                          {smartBadge.label.includes('Best') && <TrendingUp className="w-3 h-3" />}
+                          {smartBadge.label.includes('Hot') && <Flame className="w-3 h-3" />}
+                          {smartBadge.label}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Prev / Next arrows — only when multiple images */}
+                    {allImages.length > 1 && (
+                      <>
+                        <button
+                          onClick={() => goTo(activeImage - 1)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors z-10"
+                        >
+                          <ChevronLeft className="w-5 h-5 text-gray-700" />
+                        </button>
+                        <button
+                          onClick={() => goTo(activeImage + 1)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white transition-colors z-10"
+                        >
+                          <ChevronRight className="w-5 h-5 text-gray-700" />
+                        </button>
+                        {/* Dots */}
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
+                          {allImages.map((_, i) => (
+                            <button
+                              key={i}
+                              onClick={() => goTo(i)}
+                              className="transition-all duration-200"
+                              style={{
+                                width: i === activeImage ? '20px' : '6px',
+                                height: '6px',
+                                borderRadius: '9999px',
+                                background: i === activeImage ? '#009739' : '#D1D5DB',
+                                border: 'none',
+                                padding: 0,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Thumbnail strip */}
+                  {allImages.length > 1 && (
+                    <div className="flex gap-2 mb-5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                      {allImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setActiveImage(idx)}
+                          className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100 p-0 transition-all"
+                          style={{ border: `2px solid ${activeImage === idx ? '#009739' : '#e5e5e5'}`, outline: 'none' }}
+                        >
+                          <img src={img} alt="" className="w-full h-full object-contain p-1" loading="lazy" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* ─── Delivery Options (below image) ─── */}
             <div className="bg-gray-50 border border-[#EAEAEA] rounded-xl p-4 mb-3">
@@ -301,37 +341,6 @@ export const ProductPage = () => {
               )}
             </div>
 
-            {/* ─── Social Proof / Urgency Row ─── */}
-            <div className="flex flex-wrap gap-3 mb-5">
-              {/* Deal countdown timer */}
-              {product.isDeal && product.originalPrice && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(206,17,38,0.08)', border: '1px solid rgba(206,17,38,0.15)' }}>
-                  <Clock className="w-3.5 h-3.5" style={{ color: '#CE1126' }} />
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#CE1126' }}>
-                    Deal ends in {dealEndTime.hours}h {dealEndTime.minutes}m
-                  </span>
-                </div>
-              )}
-              {stockLeft <= 8 && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(206,17,38,0.08)', border: '1px solid rgba(206,17,38,0.15)' }}>
-                  <Flame className="w-3.5 h-3.5" style={{ color: '#CE1126' }} />
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#CE1126' }}>Only {stockLeft} left in stock</span>
-                </div>
-              )}
-              {/* Bought today */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(0,151,57,0.06)', border: '1px solid rgba(0,151,57,0.12)' }}>
-                <TrendingUp className="w-3.5 h-3.5" style={{ color: '#009739' }} />
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#009739' }}>{boughtTodayCount} bought today</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.06)' }}>
-                <Eye className="w-3.5 h-3.5 text-gray-500" />
-                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6b7280' }}>{viewingCount} viewing now</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(0,151,57,0.06)', border: '1px solid rgba(0,151,57,0.12)' }}>
-                <Users className="w-3.5 h-3.5" style={{ color: '#009739' }} />
-                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#009739' }}>{recentPurchases} bought this week</span>
-              </div>
-            </div>
 
             {/* Description */}
             <p className="text-sm text-gray-600 leading-relaxed mb-5">{product.description}</p>
@@ -503,31 +512,19 @@ export const ProductPage = () => {
         </div>
 
         {/* ─── Seller info & Reviews ─── */}
-        {seller && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h2 className="text-base text-gray-900 mb-4" style={{ fontWeight: 700 }}>Seller Information</h2>
-              <div className="flex items-center gap-3 mb-3">
-                <img src={seller.logo} alt={seller.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200" loading="lazy" />
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center border border-gray-200">
+                  <span className="text-xl font-bold text-gray-400">{product.sellerName?.charAt(0) ?? 'S'}</span>
+                </div>
                 <div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm text-gray-900" style={{ fontWeight: 700 }}>{seller.name}</p>
-                    {seller.verified && <CheckCircle className="w-3.5 h-3.5" fill="none" color="#009739" />}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <StarRating size={12} />
-                    <span className="text-xs text-gray-900" style={{ fontWeight: 700 }}>{seller.rating}</span>
-                    <span className="text-xs text-gray-400">({seller.reviewCount} reviews)</span>
-                  </div>
+                  <p className="text-sm text-gray-900" style={{ fontWeight: 700 }}>{product.sellerName}</p>
+                  <p className="text-xs text-gray-400">Independent seller on Msika</p>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 leading-relaxed mb-3">{seller.description}</p>
-              <div className="flex gap-2 mb-3">
-                <span className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">{seller.location}</span>
-                <span className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">Joined {seller.joined}</span>
-                <span className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">{seller.productCount} products</span>
-              </div>
-              <button onClick={() => navigate(`/store/${seller.id}`)} className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-lg text-xs border border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors" style={{ fontWeight: 600 }}>
+              <button onClick={() => navigate(`/store/${product.sellerId}`)} className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-lg text-xs border border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors" style={{ fontWeight: 600 }}>
                 Visit Store
               </button>
             </div>
@@ -713,94 +710,6 @@ export const ProductPage = () => {
               </div>
             </div>
           </div>
-        )}
-
-        {/* ─── Frequently Bought Together ─── */}
-        {frequentlyBought.length > 0 && (
-          <div className="mb-16 p-6 bg-gray-50 rounded-2xl border border-gray-100">
-            <SectionHeader overline="Bundle & Save" title="Frequently Bought Together" />
-            <div className="flex items-center gap-3 flex-wrap mb-5">
-              {/* Current product */}
-              <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-[#009739] shrink-0">
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-              </div>
-              {frequentlyBought.map((p, i) => (
-                <React.Fragment key={p.id}>
-                  <Plus className="w-4 h-4 text-gray-300 shrink-0" />
-                  <div
-                    className="w-20 h-20 rounded-xl overflow-hidden border border-gray-200 shrink-0 cursor-pointer hover:border-[#009739] transition-colors"
-                    onClick={() => navigate(`/product/${p.id}`)}
-                  >
-                    <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                  </div>
-                </React.Fragment>
-              ))}
-              <div className="ml-auto text-right">
-                <p className="text-gray-500" style={{ fontSize: '0.75rem' }}>Bundle price</p>
-                <p className="text-gray-900" style={{ fontSize: '1.2rem', fontWeight: 800 }}>{formatPrice(bundleTotal)}</p>
-                <button
-                  onClick={() => {
-                    addToCart(product);
-                    frequentlyBought.forEach(p => addToCart(p));
-                    toast.success('Bundle added!', { description: `${frequentlyBought.length + 1} items added to cart` });
-                  }}
-                  className="mt-2 px-4 py-2 bg-[#009739] text-white rounded-lg text-xs cursor-pointer hover:bg-[#007f30] transition-colors border-none"
-                  style={{ fontWeight: 700 }}
-                >
-                  Add All to Cart
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ─── More from this seller ─── */}
-        {relatedProducts.length > 0 && (
-          <div className="mb-16">
-            <SectionHeader overline="Same Seller" title={`More from ${seller?.name}`} viewAllTo={seller ? `/store/${seller.id}` : undefined} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {relatedProducts.slice(0, 4).map(p => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ─── Similar Products ─── */}
-        {similarProducts.length > 0 && (
-          <div className="mb-16">
-            <SectionHeader overline="You May Also Like" title="Similar Products" viewAllTo="/shop" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {similarProducts.slice(0, 4).map(p => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ─── Customers Also Bought ─── */}
-        {alsoB.length > 0 && (
-          <div className="mb-16">
-            <SectionHeader overline="Trending Together" title="Customers Also Bought" viewAllTo="/shop" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {alsoB.slice(0, 4).map(p => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ─── Recently Viewed ─── */}
-        {recentlyViewedProducts.length > 0 && (
-          <div className="mb-16">
-            <SectionHeader overline="Your History" title="Recently Viewed" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {recentlyViewedProducts.slice(0, 4).map(p => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ─── Chat with the Msika Team ─── */}
@@ -884,7 +793,7 @@ export const ProductPage = () => {
       {showQuotationModal && product && (
         <QuotationModal
           product={product}
-          seller={seller}
+          seller={null}
           quantity={quantity}
           user={user}
           onSubmit={(msg) => {
@@ -899,7 +808,7 @@ export const ProductPage = () => {
               quantity,
             });
             setShowQuotationModal(false);
-            toast.success('Quotation request sent!', { description: `${seller?.name} will respond shortly.` });
+            toast.success('Quotation request sent!', { description: `${product.sellerName} will respond shortly.` });
           }}
           onClose={() => setShowQuotationModal(false)}
         />

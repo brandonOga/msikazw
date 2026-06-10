@@ -35,6 +35,7 @@ export interface Product {
   inStock: boolean;
   deliveryBadge: string;
   paymentMethods: string[];
+  createdAt?: string;
 }
 
 export interface Seller {
@@ -271,13 +272,27 @@ export const getDealEndTime = (productId: string): { hours: number; minutes: num
   return { hours: (hash % 23) + 1, minutes: (hash % 59) + 1, seconds: (hash % 59) + 1 };
 };
 
+// Returns a platform-generated badge — sellers cannot control this directly.
+// Priority: high sales → discounts → rating
 export const getSmartBadge = (product: Product): { label: string; color: string } | null => {
-  if (product.reviewCount > 200) return { label: 'Best Seller', color: '#CE1126' };
-  if (product.isDeal && product.originalPrice) return { label: 'Hot Deal', color: '#CE1126' };
-  const stock = getStockLeft(product.id);
-  if (stock <= 5) return { label: `Only ${stock} left`, color: '#CE1126' };
-  if (product.rating >= 4.8 && product.reviewCount > 40) return { label: 'Top Rated', color: '#009739' };
+  if (product.reviewCount >= 50) return { label: 'Best Seller', color: '#CE1126' };
+  if (product.originalPrice && product.originalPrice > product.price) {
+    const disc = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+    if (disc >= 15) return { label: 'Hot Deal', color: '#f97316' };
+  }
+  if (product.rating >= 4.7 && product.reviewCount >= 20) return { label: 'Top Rated', color: '#009739' };
+  // Tag-based (platform/admin can add these via the tags field)
+  const tags = product.tags.map(t => t.toLowerCase());
+  if (tags.includes('trending')) return { label: 'Trending', color: '#009739' };
   return null;
+};
+
+// Auto-detects if a product is "new" (created within the last 30 days)
+export const isProductNew = (product: Product): boolean => {
+  if (!product.createdAt) return product.isNew ?? false;
+  const created = new Date(product.createdAt).getTime();
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  return created >= thirtyDaysAgo;
 };
 
 export const getDeliveryEstimate = (badge: string): string => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { useNavigate, Link } from 'react-router';
 import { useStore, PlacedOrder, DeliveryDetails } from '../context/StoreContext';
 import {
@@ -513,6 +514,8 @@ export const CheckoutPage = () => {
       )}
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Breadcrumbs className="mb-6" crumbs={[{ label: 'Cart', href: '/cart' }, { label: 'Checkout' }]} />
+
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <button

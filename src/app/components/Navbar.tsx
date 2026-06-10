@@ -52,7 +52,7 @@ export const Navbar = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/categories?search=${encodeURIComponent(searchQuery)}`);
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
       setSearchQuery('');
       setShowSearch(false);
     }
@@ -60,43 +60,40 @@ export const Navbar = () => {
 
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative flex justify-between items-center h-16">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-4 h-16">
 
           {/* Logo — left */}
           <Link to="/" className="flex items-center shrink-0">
             <MsikaLogo size="md" color="dark" />
           </Link>
 
-          {/* Nav Links — center (Desktop) */}
-          <div className="hidden md:flex items-center justify-center gap-6 absolute left-1/2 -translate-x-1/2">
-            {[
-              { to: '/', label: 'Home' },
-              { to: '/shop', label: 'Browse Products' },
-              { to: '/shops', label: 'Shops' },
-              { to: '/all-categories', label: 'Categories' },
-              ...(user ? [{ to: '/orders', label: 'Orders' }] : []),
-              ...(user?.role === 'seller' ? [{ to: '/seller-dashboard', label: 'Dashboard' }] : []),
-              ...(user?.role === 'admin' ? [{ to: '/admin-dashboard', label: 'Admin' }] : []),
-              ...(user && user.role !== 'seller' && onboardingStatus === 'none' ? [] : []),
-            ].map(link => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className="text-sm transition-colors whitespace-nowrap"
-                style={navLinkStyle(link.to)}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
+          {/* Search bar — center, grows to fill available space */}
+          <form onSubmit={handleSearch} className="hidden sm:flex flex-1 items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden hover:border-[#009739] focus-within:border-[#009739] transition-colors mx-2 px-1.5 py-0.5">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search products, brands, categories…"
+              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 px-2.5 py-2.5 placeholder:text-gray-400"
+            />
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery('')} className="p-2 text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer shrink-0">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button type="submit" className="flex items-center gap-2.5  px-3.5 py-2.5 bg-[#009739] hover:bg-[#007f30] text-white text-xs transition-colors shrink-0 rounded-full border-none cursor-pointer" style={{ fontWeight: 700 }}>
+              <Search className="w-4 h-4" />
+              Search
+            </button>
+          </form>
 
           {/* Actions — right */}
-          <div className="flex items-center gap-2">
-            {/* Search icon */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Mobile search icon */}
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className="p-2 text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-50"
+              className="sm:hidden p-2 text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-50"
               aria-label="Search"
             >
               <Search className="w-5 h-5" />
@@ -270,20 +267,47 @@ export const Navbar = () => {
             </button>
           </div>
         </div>
+
+        {/* Nav links row — desktop only */}
+        <div className="hidden md:flex items-center gap-6 pb-2 border-t border-gray-50 pt-1.5">
+          {[
+            { to: '/', label: 'Home' },
+            { to: '/shop', label: 'Browse Products' },
+            { to: '/shops', label: 'Shops' },
+            { to: '/all-categories', label: 'Categories' },
+            ...(user ? [{ to: '/orders', label: 'Orders' }] : []),
+            ...(user?.role === 'seller' ? [{ to: '/seller-dashboard', label: 'Dashboard' }] : []),
+            ...(user?.role === 'admin' ? [{ to: '/admin-dashboard', label: 'Admin' }] : []),
+          ].map(link => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className="text-sm transition-colors whitespace-nowrap"
+              style={navLinkStyle(link.to)}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Mobile search */}
       {showSearch && (
-        <div className="border-t border-gray-100 px-4 py-3 bg-white">
-          <form onSubmit={handleSearch} className="flex items-center bg-gray-50 border border-gray-200 rounded-lg overflow-hidden max-w-lg mx-auto">
+        <div className="sm:hidden border-t border-gray-100 px-4 py-3 bg-white">
+          <form onSubmit={handleSearch} className="flex items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
             <Search className="w-4 h-4 text-gray-400 ml-3 shrink-0" />
             <input
               type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search products…"
-              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 px-2 py-2.5"
+              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 px-2.5 py-2.5"
               autoFocus
             />
-            <button type="submit" className="px-3 py-2 text-[#009739]" style={{ fontSize: '13px', fontWeight: 600 }}>Go</button>
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery('')} className="p-2 text-gray-400 bg-transparent border-none cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button type="submit" className="px-3 py-2.5 bg-[#009739] text-white text-xs border-none cursor-pointer" style={{ fontWeight: 700 }}>Go</button>
           </form>
         </div>
       )}
