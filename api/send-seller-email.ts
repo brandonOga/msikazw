@@ -43,7 +43,7 @@ function buildEmail(type: EmailType, name: string, referenceNumber: string): { s
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed')
 
-  const ip = (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim() || 'unknown'
+  const ip = (req.headers?.['x-forwarded-for'] as string || '').split(',')[0].trim() || 'unknown'
   if (!checkRateLimit(ip)) {
     return res.status(429).json({ error: 'Too many requests' })
   }

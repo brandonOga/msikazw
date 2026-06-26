@@ -6,7 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed')
 
   const secret = process.env.DELIVERY_WEBHOOK_SECRET
-  const sigHeader = (req.headers['x-delivery-signature'] as string) || (req.headers['x-signature'] as string)
+  const sigHeader = (req.headers?.['x-delivery-signature'] as string) || (req.headers?.['x-signature'] as string)
   const event = req.body
 
   if (secret && sigHeader) {

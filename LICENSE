@@ -1,0 +1,23 @@
+COMMERCIAL & PROPRIETARY SOFTWARE LICENSE
+
+Copyright (c) 2026 Msika & Kawerifytech (kawerifytech.com). All rights reserved.
+
+This software and all associated documentation files (the "Software") are proprietary to Msika and Kawerifytech. 
+
+Licensing and Usage Conditions:
+
+1. Permitted Hosting & Operation:
+   - Hosting and operation of this Software is strictly restricted to the official domains:
+     - msika.shop (and its subdomains)
+     - kawerifytech.com (and its subdomains)
+   - Running the Software in local development environments (e.g. localhost, 127.0.0.1) for testing, development, and debugging purposes is permitted.
+
+2. Access Restrictions:
+   - Any deployment, reproduction, or use of the Software on domains other than the permitted domains without express, written authorization from Kawerifytech is strictly prohibited.
+   - Access control features (such as domain guards and passcodes) built into the Software must not be bypassed, modified, or removed.
+
+3. Intellectual Property:
+   - All intellectual property rights, trademarks, assets, graphics, and source code belong solely to Msika and Kawerifytech. No ownership or rights are transferred by accessing or downloading this codebase.
+   - Modifications made to the Software are subject to this license. Any fork, copy, or derivative work of this software remains proprietary and is subject to the same hosting restrictions.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

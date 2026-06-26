@@ -6,7 +6,7 @@ vi.mock('../../../src/lib/email', () => ({ sendTransactionalEmail: vi.fn().mockR
 import handler from '../../../api/send-seller-email'
 
 function makeReq(body: any) {
-  return { method: 'POST', body }
+  return { method: 'POST', body, headers: {} }
 }
 
 function makeRes() {
