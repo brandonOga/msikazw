@@ -17,18 +17,20 @@ import {
 } from 'recharts';
 import { categories } from '../data/mockData';
 import { Product } from '../data/mockData';
-import { EscrowStatus } from '../context/StoreContext';
+import { EscrowStatus, QuotationRequest } from '../context/StoreContext';
 import { toast } from 'sonner';
 import { SellerFulfillmentModal, TrackOrderData } from '../components/OrderTracker';
 import { uploadProductImage, uploadSellerImage } from '../../lib/storage';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { fetchSellerOrders, type SellerOrderItem } from '../../lib/db/orders';
 import * as ordersDb from '../../lib/db/orders';
+import * as quotationsDb from '../../lib/db/quotations';
 import { fetchSellerById, updateSeller } from '../../lib/db/sellers';
 import { SELLER_HEADER_H } from '../DashboardLayout';
+import { AFRICAN_CODES } from '../components/PhoneInput';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'products' | 'orders' | 'payments' | 'analytics' | 'profile';
+type Tab = 'overview' | 'products' | 'orders' | 'payments' | 'analytics' | 'profile' | 'notifications' | 'quotations';
 type Order = SellerOrderItem;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -46,6 +48,7 @@ const STATUS_FLOW = [
   'awaiting_payment', 'payment_confirmed', 'funds_held',
   'in_transit', 'delivery_confirmed', 'released',
 ];
+
 
 // Revenue and category data are computed from real orders below (inside the component)
 
@@ -374,7 +377,7 @@ function ProductModal({ product, onSave, onClose, userId }: {
                     onChange={e => { setForm(f => ({ ...f, category: e.target.value })); setErrors(er => ({ ...er, category: '' })); }}
                     className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:border-[#009739] bg-white ${errors.category ? 'border-red-400' : 'border-gray-200'}`}>
                     <option value="">Select category…</option>
-                    {categories.map(c => <option key={c.id} value={c.name}>{c.emoji} {c.name}</option>)}
+                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                   {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
                 </div>
@@ -603,21 +606,27 @@ export function SellerDashboard() {
   const {
     user, formatPrice, currency, toggleCurrency, sellerDbId,
     sellerProducts, addSellerProduct, updateSellerProduct, toggleProductStock, removeSellerProduct,
-    notifications, unreadCount, markAllRead, addNotification,
-    onboardingStatus,
+    notifications, unreadCount, markAllRead, markNotificationRead, addNotification,
+    onboardingStatus, updateProfile,
   } = useStore();
 
   const [tab, setTab] = useState<Tab>('overview');
   const [sellerOrders, setSellerOrders] = useState<SellerOrderItem[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [sellerQuotations, setSellerQuotations] = useState<QuotationRequest[]>([]);
+  const [quotationsLoading, setQuotationsLoading] = useState(true);
+  const [notifFilter, setNotifFilter] = useState<'all' | 'order' | 'system' | 'promo' | 'quotation' | 'unread'>('all');
 
   // Settings tab state
   const [settingsName, setSettingsName] = useState('');
   const [settingsEcocash, setSettingsEcocash] = useState('');
   const [settingsWhatsapp, setSettingsWhatsapp] = useState('');
+  const [whatsappCode, setWhatsappCode] = useState('+263');
+  const [ecocashCode, setEcocashCode] = useState('+263');
   const [settingsLocation, setSettingsLocation] = useState('');
   const [settingsDescription, setSettingsDescription] = useState('');
-  const [settingsCategory, setSettingsCategory] = useState('');
+  const [settingsCategory, setSettingsCategory] = useState<string[]>([]);
+  const [catDropOpen, setCatDropOpen] = useState(false);
   const [settingsWebsite, setSettingsWebsite] = useState('');
   const [settingsLogo, setSettingsLogo] = useState('');
   const [settingsBanner, setSettingsBanner] = useState('');
@@ -629,10 +638,13 @@ export function SellerDashboard() {
     fetchSellerById(sellerDbId).then(seller => {
       if (!seller) return;
       setSettingsName(seller.name ?? '');
-      setSettingsWhatsapp(seller.whatsapp ?? '');
+      const wa = seller.whatsapp ?? '';
+      const waMatch = wa.match(/^(\+\d{1,4})\s*(.*)/);
+      if (waMatch) { setWhatsappCode(waMatch[1]); setSettingsWhatsapp(waMatch[2]); }
+      else setSettingsWhatsapp(wa);
       setSettingsLocation(seller.location ?? '');
       setSettingsDescription(seller.description ?? '');
-      setSettingsCategory(seller.category ?? '');
+      setSettingsCategory(seller.category ? seller.category.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
       setSettingsLogo(seller.logo ?? '');
       setSettingsBanner(seller.banner ?? '');
     });
@@ -643,13 +655,16 @@ export function SellerDashboard() {
     setSettingsSaving(true);
     await updateSeller(sellerDbId, {
       name: settingsName,
-      whatsapp: settingsWhatsapp,
+      whatsapp: settingsWhatsapp ? `${whatsappCode} ${settingsWhatsapp}` : '',
       location: settingsLocation,
       description: settingsDescription,
+      category: settingsCategory.join(', '),
       logo: settingsLogo,
       banner: settingsBanner,
     });
     setSettingsSaving(false);
+    // Keep header avatar in sync with the store logo
+    if (settingsLogo) updateProfile({ avatar: settingsLogo });
     toast.success('Profile saved!');
   };
 
@@ -661,6 +676,25 @@ export function SellerDashboard() {
       .then(orders => { setSellerOrders(orders); setOrdersLoading(false); })
       .catch(() => setOrdersLoading(false));
   }, [sellerDbId]);
+
+  // Load quotation requests for this seller's products
+  useEffect(() => {
+    if (!sellerDbId || !isSupabaseConfigured) return;
+    setQuotationsLoading(true);
+    quotationsDb.fetchSellerQuotations(sellerDbId)
+      .then(qs => { setSellerQuotations(qs); setQuotationsLoading(false); })
+      .catch(() => setQuotationsLoading(false));
+  }, [sellerDbId]);
+
+  const refreshQuotations = () => {
+    if (!sellerDbId) return;
+    quotationsDb.fetchSellerQuotations(sellerDbId).then(setSellerQuotations);
+  };
+
+  const respondToQuotation = async (id: string, status: QuotationRequest['status']) => {
+    setSellerQuotations(prev => prev.map(q => (q.id === id ? { ...q, status } : q)));
+    await quotationsDb.updateQuotationStatus(id, status);
+  };
 
   // Show a bottom toast once when seller lands on dashboard with pending status
   useEffect(() => {
@@ -781,18 +815,21 @@ export function SellerDashboard() {
     return { label: LABELS[s], next };
   };
 
+  const pendingQuotationsCount = sellerQuotations.filter(q => q.status === 'pending').length;
+
   const NAV: { id: Tab; icon: React.ElementType; label: string; badge?: number; badgeColor?: string }[] = [
     { id: 'overview',  icon: LayoutDashboard, label: 'Overview' },
     { id: 'products',  icon: Package,         label: 'Products', badge: outOfStockCount > 0 ? outOfStockCount : undefined, badgeColor: '#856404' },
     { id: 'orders',    icon: ShoppingBag,     label: 'Orders',   badge: needsActionCount > 0 ? needsActionCount : undefined, badgeColor: '#CE1126' },
+    { id: 'quotations', icon: MessageCircle,  label: 'Quotations', badge: pendingQuotationsCount > 0 ? pendingQuotationsCount : undefined, badgeColor: '#9333ea' },
     { id: 'payments',  icon: Wallet,          label: 'Payments', badge: paymentsBadge > 0 ? paymentsBadge : undefined, badgeColor: '#009739' },
-    { id: 'analytics', icon: TrendingUp,      label: 'Analytics' },
-    { id: 'profile',   icon: UserCircle,      label: 'Profile' },
+    { id: 'analytics',     icon: TrendingUp,      label: 'Analytics' },
+    { id: 'notifications', icon: Bell,            label: 'Notifications', badge: unreadCount > 0 ? unreadCount : undefined, badgeColor: '#CE1126' },
   ];
 
   const TAB_LABELS: Record<Tab, string> = {
-    overview: 'Overview', products: 'Products', orders: 'Orders',
-    payments: 'Payments', analytics: 'Analytics', profile: 'Profile',
+    overview: 'Overview', products: 'Products', orders: 'Orders', quotations: 'Quotations',
+    payments: 'Payments', analytics: 'Analytics', profile: 'Profile', notifications: 'Notifications',
   };
 
   return (
@@ -1741,14 +1778,41 @@ export function SellerDashboard() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-gray-500 mb-1.5" style={{ fontSize: '0.75rem', fontWeight: 600 }}>Category</label>
+                    <label className="block text-gray-500 mb-1.5" style={{ fontSize: '0.75rem', fontWeight: 600 }}>Categories</label>
                     <div className="relative">
-                      <select value={settingsCategory} onChange={e => setSettingsCategory(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#009739] transition-colors bg-gray-50 appearance-none"
-                        style={{ fontSize: '0.85rem' }}>
-                        <option value="">Select category…</option>
-                        {categories.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setCatDropOpen(o => !o)}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-left flex items-center justify-between cursor-pointer"
+                        style={{ fontSize: '0.85rem' }}
+                      >
+                        <span className={settingsCategory.length ? 'text-gray-900' : 'text-gray-400'}>
+                          {settingsCategory.length ? settingsCategory.join(', ') : 'Select categories…'}
+                        </span>
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${catDropOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                      {catDropOpen && (
+                        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto" style={{ maxHeight: 220 }}>
+                          {categories.map(c => {
+                            const selected = settingsCategory.includes(c.name);
+                            return (
+                              <label key={c.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={() => setSettingsCategory(prev =>
+                                    selected ? prev.filter(x => x !== c.name) : [...prev, c.name]
+                                  )}
+                                  className="w-4 h-4 rounded accent-[#009739] cursor-pointer"
+                                />
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '0.85rem', color: '#374151' }}>
+                                  <c.icon className="w-3.5 h-3.5 text-gray-400" /> {c.name}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -1757,16 +1821,6 @@ export function SellerDashboard() {
                       <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input type="text" value={settingsLocation} onChange={e => setSettingsLocation(e.target.value)}
                         placeholder="e.g. Harare CBD, Zimbabwe"
-                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#009739] transition-colors bg-gray-50"
-                        style={{ fontSize: '0.85rem' }} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-gray-500 mb-1.5" style={{ fontSize: '0.75rem', fontWeight: 600 }}>Website (optional)</label>
-                    <div className="relative">
-                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input type="url" value={settingsWebsite} onChange={e => setSettingsWebsite(e.target.value)}
-                        placeholder="https://yourstore.co.zw"
                         className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#009739] transition-colors bg-gray-50"
                         style={{ fontSize: '0.85rem' }} />
                     </div>
@@ -1788,21 +1842,29 @@ export function SellerDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-gray-500 mb-1.5" style={{ fontSize: '0.75rem', fontWeight: 600 }}>EcoCash Number</label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <div className="flex gap-2">
+                      <select value={ecocashCode} onChange={e => setEcocashCode(e.target.value)}
+                        className="border border-gray-200 rounded-xl bg-gray-50 text-gray-900 focus:outline-none focus:border-[#009739] transition-colors px-2"
+                        style={{ fontSize: '0.85rem', width: 90, flexShrink: 0 }}>
+                        {AFRICAN_CODES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+                      </select>
                       <input type="tel" value={settingsEcocash} onChange={e => setSettingsEcocash(e.target.value)}
-                        placeholder="+263 77 123 4567"
-                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#009739] transition-colors bg-gray-50"
+                        placeholder="77 123 4567"
+                        className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#009739] transition-colors bg-gray-50"
                         style={{ fontSize: '0.85rem' }} />
                     </div>
                   </div>
                   <div>
                     <label className="block text-gray-500 mb-1.5" style={{ fontSize: '0.75rem', fontWeight: 600 }}>WhatsApp Number</label>
-                    <div className="relative">
-                      <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <div className="flex gap-2">
+                      <select value={whatsappCode} onChange={e => setWhatsappCode(e.target.value)}
+                        className="border border-gray-200 rounded-xl bg-gray-50 text-gray-900 focus:outline-none focus:border-[#009739] transition-colors px-2"
+                        style={{ fontSize: '0.85rem', width: 90, flexShrink: 0 }}>
+                        {AFRICAN_CODES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+                      </select>
                       <input type="tel" value={settingsWhatsapp} onChange={e => setSettingsWhatsapp(e.target.value)}
-                        placeholder="+263 77 123 4567"
-                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#009739] transition-colors bg-gray-50"
+                        placeholder="77 123 4567"
+                        className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#009739] transition-colors bg-gray-50"
                         style={{ fontSize: '0.85rem' }} />
                     </div>
                   </div>
@@ -1821,6 +1883,183 @@ export function SellerDashboard() {
 
             </div>
           )}
+
+          {/* ══════════════════════════════════════════════════
+              NOTIFICATIONS
+          ══════════════════════════════════════════════════ */}
+          {tab === 'notifications' && (() => {
+            const filtered = notifications.filter(n => {
+              if (notifFilter === 'unread') return !n.read;
+              if (notifFilter === 'all') return true;
+              return n.type === notifFilter;
+            });
+            const typeBadge = (type: string) => {
+              switch (type) {
+                case 'order':     return { bg: 'rgba(0,151,57,0.1)',  color: '#009739', label: 'Order' };
+                case 'system':    return { bg: 'rgba(59,130,246,0.1)', color: '#2563eb', label: 'System' };
+                case 'promo':     return { bg: 'rgba(245,158,11,0.1)', color: '#d97706', label: 'Promo' };
+                case 'quotation': return { bg: 'rgba(147,51,234,0.1)', color: '#9333ea', label: 'Quotation' };
+                default:          return { bg: '#f3f4f6', color: '#6b7280', label: type };
+              }
+            };
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+                  <h2 className="text-gray-900" style={{ fontSize: '1.3rem', fontWeight: 800 }}>Notifications</h2>
+                  <button onClick={markAllRead}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-[#EAEAEA] text-gray-600 hover:bg-gray-50 cursor-pointer bg-white transition-colors"
+                    style={{ fontWeight: 600 }}>
+                    Mark all read
+                  </button>
+                </div>
+                <div className="flex gap-2 mb-6 flex-wrap">
+                  {([
+                    { id: 'all',    label: 'All' },
+                    { id: 'unread', label: `Unread${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
+                    { id: 'order',     label: 'Orders' },
+                    { id: 'quotation', label: 'Quotations' },
+                    { id: 'system',    label: 'System' },
+                    { id: 'promo',     label: 'Promos' },
+                  ] as const).map(f => (
+                    <button key={f.id} onClick={() => setNotifFilter(f.id)}
+                      className="px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border-none"
+                      style={{ background: notifFilter === f.id ? '#009739' : '#f3f4f6', color: notifFilter === f.id ? '#fff' : '#6b7280', fontWeight: notifFilter === f.id ? 700 : 500 }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                {filtered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <Bell className="w-10 h-10 text-gray-300 mb-3" />
+                    <p className="text-gray-900" style={{ fontWeight: 700 }}>No notifications</p>
+                    <p className="text-sm text-gray-400 mt-1">{notifFilter === 'unread' ? "You're all caught up." : "Nothing here yet."}</p>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                    {filtered.map((n, idx) => {
+                      const badge = typeBadge(n.type);
+                      const goesTo: Tab | null = n.type === 'quotation' ? 'quotations' : n.type === 'order' ? 'orders' : null;
+                      return (
+                        <button key={n.id}
+                          onClick={() => {
+                            if (!n.read) markNotificationRead(n.id);
+                            if (goesTo) setTab(goesTo);
+                          }}
+                          className="w-full flex items-start gap-4 px-5 py-4 text-left cursor-pointer bg-transparent border-none hover:bg-gray-50 transition-colors"
+                          style={{ background: n.read ? '#fff' : 'rgba(0,151,57,0.03)', borderBottom: idx < filtered.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: n.read ? '#d1d5db' : '#009739', marginTop: 6 }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                              <p className="text-sm text-gray-900 truncate" style={{ fontWeight: n.read ? 500 : 700 }}>{n.title}</p>
+                              <span className="px-2 py-0.5 rounded-full shrink-0" style={{ fontSize: '0.65rem', fontWeight: 700, background: badge.bg, color: badge.color }}>{badge.label}</span>
+                            </div>
+                            <p className="text-sm text-gray-500 leading-relaxed">{n.body}</p>
+                            <p className="text-xs text-gray-400 mt-1">{n.time}</p>
+                          </div>
+                          {goesTo && <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mt-1" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════
+              QUOTATIONS
+          ══════════════════════════════════════════════════ */}
+          {tab === 'quotations' && (() => {
+            const QUOTE_STATUS_META: Record<string, { bg: string; color: string; label: string }> = {
+              pending:  { bg: 'rgba(217,119,6,0.1)',  color: '#d97706', label: 'Pending' },
+              replied:  { bg: 'rgba(37,99,235,0.1)',  color: '#2563eb', label: 'Replied' },
+              accepted: { bg: 'rgba(0,151,57,0.1)',   color: '#009739', label: 'Accepted' },
+              declined: { bg: '#f3f4f6',              color: '#6b7280', label: 'Declined' },
+            };
+            const waLink = (phone: string, productName: string) =>
+              `https://wa.me/${phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(`Hi! Following up on your quote request for "${productName}".`)}`;
+
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+                  <h2 className="text-gray-900" style={{ fontSize: '1.3rem', fontWeight: 800 }}>Quotation Requests</h2>
+                  <button onClick={refreshQuotations}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-[#EAEAEA] text-gray-600 hover:bg-gray-50 cursor-pointer bg-white transition-colors"
+                    style={{ fontWeight: 600 }}>
+                    <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                  </button>
+                </div>
+
+                {quotationsLoading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-6 h-6 text-gray-300 animate-spin" />
+                  </div>
+                ) : sellerQuotations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <MessageCircle className="w-10 h-10 text-gray-300 mb-3" />
+                    <p className="text-gray-900" style={{ fontWeight: 700 }}>No quotation requests yet</p>
+                    <p className="text-sm text-gray-400 mt-1">Buyers who request a custom quote on your products will show up here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {sellerQuotations.map(q => {
+                      const meta = QUOTE_STATUS_META[q.status] || QUOTE_STATUS_META.pending;
+                      return (
+                        <div key={q.id} className="bg-white border border-[#EAEAEA] rounded-2xl p-5" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                          <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {q.productImage && <img src={q.productImage} alt={q.productName} className="w-12 h-12 rounded-lg object-cover shrink-0 bg-gray-100" />}
+                              <div className="min-w-0">
+                                <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 700 }}>{q.productName}</p>
+                                <p className="text-xs text-gray-400">Qty: {q.quantity} · {q.date}</p>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-full shrink-0" style={{ fontSize: '0.65rem', fontWeight: 700, background: meta.bg, color: meta.color }}>{meta.label}</span>
+                          </div>
+
+                          <div className="mb-3">
+                            <p className="text-sm text-gray-900" style={{ fontWeight: 600 }}>{q.buyerName}</p>
+                            {q.message && <p className="text-sm text-gray-500 mt-0.5 leading-relaxed">"{q.message}"</p>}
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {q.buyerPhone && (
+                              <>
+                                <a href={`tel:${q.buyerPhone}`}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-[#EAEAEA] text-gray-700 hover:bg-gray-50 transition-colors no-underline"
+                                  style={{ fontWeight: 600 }}>
+                                  <Phone className="w-3.5 h-3.5" /> Call
+                                </a>
+                                <a href={waLink(q.buyerPhone, q.productName)} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-[#EAEAEA] text-gray-700 hover:bg-gray-50 transition-colors no-underline"
+                                  style={{ fontWeight: 600 }}>
+                                  <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                                </a>
+                              </>
+                            )}
+                            {q.status === 'pending' && (
+                              <>
+                                <button onClick={() => respondToQuotation(q.id, 'replied')}
+                                  className="px-3 py-1.5 rounded-lg text-xs bg-[#009739] hover:bg-[#007f30] text-white transition-colors cursor-pointer border-none"
+                                  style={{ fontWeight: 600 }}>
+                                  Mark as Replied
+                                </button>
+                                <button onClick={() => respondToQuotation(q.id, 'declined')}
+                                  className="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-50 transition-colors cursor-pointer border-none bg-transparent"
+                                  style={{ fontWeight: 600 }}>
+                                  Decline
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
         </main>
       </div>

@@ -3,6 +3,7 @@ import { RootLayout }      from "./RootLayout";
 import { AuthLayout }      from "./AuthLayout";
 import { AdminLayout }     from "./AdminLayout";
 import { DashboardLayout } from "./DashboardLayout";
+import { BuyerLayout }     from "./BuyerLayout";
 
 import { LandingPage }      from "./pages/LandingPage";
 import { AuthPage }         from "./pages/AuthPage";
@@ -12,6 +13,7 @@ import { CartPage }         from "./pages/CartPage";
 import { CheckoutPage }     from "./pages/CheckoutPage";
 import { Orders }           from "./pages/Orders";
 import { Profile }          from "./pages/Profile";
+import { BuyerDashboard }   from "./pages/BuyerDashboard";
 import { Categories }       from "./pages/Categories";
 import { SellerStore }      from "./pages/SellerStore";
 import { SellerDashboard }  from "./pages/SellerDashboard";
@@ -28,7 +30,8 @@ import { ForgotPassword }   from "./pages/ForgotPassword";
 import { ResetPassword }    from "./pages/ResetPassword";
 import { SearchPage }       from "./pages/SearchPage";
 import { TermsPage }        from "./pages/TermsPage";
-import { PrivacyPage }      from "./pages/PrivacyPage";
+import { PrivacyPage }          from "./pages/PrivacyPage";
+import { NotificationsPage }   from "./pages/NotificationsPage";
 
 export const router = createBrowserRouter([
 
@@ -52,7 +55,8 @@ export const router = createBrowserRouter([
       { path: 'wishlist',       Component: WishlistPage      },
       { path: 'search',         Component: SearchPage        },
       { path: 'terms',          Component: TermsPage         },
-      { path: 'privacy',        Component: PrivacyPage       },
+      { path: 'privacy',         Component: PrivacyPage       },
+      { path: 'notifications',   Component: NotificationsPage },
       { path: '*',              Component: () => <Navigate to="/" replace /> },
     ],
   },
@@ -66,6 +70,15 @@ export const router = createBrowserRouter([
       { path: 'seller/products/new',         Component: SellerProductEdit },
       { path: 'seller/products/:id/edit',    Component: SellerProductEdit },
       { path: 'seller-onboarding',           Component: SellerOnboarding  },
+    ],
+  },
+
+  // ── Buyer dashboard — no storefront navbar (has its own header) ───────────
+  {
+    path: '/',
+    Component: BuyerLayout,
+    children: [
+      { path: 'dashboard', Component: BuyerDashboard },
     ],
   },
 

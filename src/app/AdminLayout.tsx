@@ -4,7 +4,6 @@ import { StoreProvider } from './context/StoreContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DashboardHeader, HEADER_H } from './components/DashboardHeader';
 
-// Re-export so AdminDashboard can import it
 export { HEADER_H as ADMIN_HEADER_H };
 
 export const AdminLayout = () => {

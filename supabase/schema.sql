@@ -393,3 +393,107 @@ create policy "Seller can view orders containing their products"
 --   update public.profiles set role = 'admin' where id = '<user-uuid>';
 -- Replace <user-uuid> with the UUID from Supabase Auth → Users dashboard.
 -- Only do this for trusted users — admin role grants full dashboard access.
+
+-- ── Migration: notify seller on quotation request ────────────────────────────
+-- Buyers requesting a quote never notified the seller — nothing wrote to
+-- public.notifications for the seller's user_id. Add a trigger that does it
+-- server-side (security definer), since RLS forbids a buyer's client from
+-- inserting a notification row owned by another user (the seller).
+
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in ('order','promo','system','quotation'));
+
+create or replace function public.handle_new_quotation()
+returns trigger language plpgsql security definer as $$
+declare
+  seller_user_id uuid;
+begin
+  if new.product_id is null then
+    return new;
+  end if;
+
+  select s.user_id into seller_user_id
+  from public.products p
+  join public.sellers s on s.id = p.seller_id
+  where p.id = new.product_id;
+
+  if seller_user_id is not null then
+    insert into public.notifications (user_id, type, title, body)
+    values (
+      seller_user_id,
+      'quotation',
+      'New Quotation Request',
+      new.buyer_name || ' requested a quote for "' || new.product_name || '" (qty: ' || coalesce(new.quantity, 1) || ')'
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace trigger on_quotation_created
+  after insert on public.quotations
+  for each row execute procedure public.handle_new_quotation();
+
+-- Sellers could not view quotation requests for their own products at all
+-- (the only quotations policy was "buyer can manage own quotations").
+create policy "Seller can view quotations for their products"
+  on public.quotations for select using (
+    exists (
+      select 1 from public.products p
+      join public.sellers s on s.id = p.seller_id
+      where p.id = product_id and s.user_id = auth.uid()
+    )
+  );
+
+-- Sellers can update status (e.g. mark 'replied') on quotations for their products
+create policy "Seller can update quotations for their products"
+  on public.quotations for update using (
+    exists (
+      select 1 from public.products p
+      join public.sellers s on s.id = p.seller_id
+      where p.id = product_id and s.user_id = auth.uid()
+    )
+  );
+
+-- ── Migration: notify buyer on quotation status change ───────────────────────
+-- When a seller declines/replies/accepts a quote, nothing told the buyer.
+-- Same rationale as the on_quotation_created trigger: the seller's client
+-- can't insert a notification row owned by the buyer's user_id under RLS,
+-- so this has to run server-side.
+
+create or replace function public.handle_quotation_status_change()
+returns trigger language plpgsql security definer as $$
+begin
+  if new.status = old.status then
+    return new;
+  end if;
+
+  if new.status = 'declined' then
+    insert into public.notifications (user_id, type, title, body)
+    values (
+      new.buyer_id, 'quotation', 'Quotation Declined',
+      'Your quote request for "' || new.product_name || '" was declined by the seller.'
+    );
+  elsif new.status = 'accepted' then
+    insert into public.notifications (user_id, type, title, body)
+    values (
+      new.buyer_id, 'quotation', 'Quotation Accepted',
+      'Your quote request for "' || new.product_name || '" was accepted!'
+    );
+  elsif new.status = 'replied' then
+    insert into public.notifications (user_id, type, title, body)
+    values (
+      new.buyer_id, 'quotation', 'Quotation Update',
+      'The seller responded to your quote request for "' || new.product_name || '".'
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace trigger on_quotation_status_changed
+  after update on public.quotations
+  for each row execute procedure public.handle_quotation_status_change();

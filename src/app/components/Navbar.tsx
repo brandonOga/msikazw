@@ -2,27 +2,31 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
 import {
   Search, ShoppingBag, User, Store, Menu, X, Package,
-  Heart, LogOut, ChevronDown, Bell, LayoutDashboard, AlertCircle,
+  Heart, LogOut, ChevronDown, Bell, LayoutDashboard, AlertCircle, TrendingUp,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { MsikaLogo } from './MsikaLogo';
+import { useProducts, useTrendingCategories } from '../../lib/hooks/useProducts';
 
 export const Navbar = () => {
-  const { user, logout, cartItemsCount, openCart, currency, toggleCurrency, notifications, unreadCount, markAllRead } = useStore();
+  const { user, logout, cartItemsCount, openCart, currency, toggleCurrency, formatPrice, notifications, unreadCount, markAllRead } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const notifsRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Close menus on route change
   useEffect(() => {
     setShowMobileMenu(false);
     setShowProfileMenu(false);
     setShowNotifs(false);
+    setShowSearch(false);
   }, [location.pathname]);
 
   // Close notifs on outside click
@@ -36,9 +40,36 @@ export const Navbar = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Focus input when search opens; close on Escape
+  useEffect(() => {
+    if (showSearch) {
+      searchInputRef.current?.focus();
+      const handler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setShowSearch(false);
+      };
+      document.addEventListener('keydown', handler);
+      return () => document.removeEventListener('keydown', handler);
+    }
+  }, [showSearch]);
+
+  // Debounce the query before hitting the product suggestions lookup
+  useEffect(() => {
+    if (!showSearch) { setDebouncedQuery(''); return; }
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery, showSearch]);
+
+  const showSuggestions = debouncedQuery.length >= 2;
+  const { products: suggestions, loading: suggestionsLoading } = useProducts({
+    search: debouncedQuery,
+    limit: 5,
+    skip: !showSuggestions,
+  });
+  const { categories: trendingSearches } = useTrendingCategories(6);
+
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(path);
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   const navLinkStyle = (path: string): React.CSSProperties => ({
@@ -49,6 +80,14 @@ export const Navbar = () => {
     transition: 'all 0.15s',
   });
 
+  const navLinks = [
+    { to: '/', label: 'Home' },
+    { to: '/shop', label: 'Browse Products' },
+    { to: '/shops', label: 'Shops' },
+    { to: '/all-categories', label: 'Categories' },
+    ...(user?.role === 'admin' ? [{ to: '/admin-dashboard', label: 'Admin' }] : []),
+  ];
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -58,47 +97,54 @@ export const Navbar = () => {
     }
   };
 
+  const handleTrendingClick = (term: string) => {
+    navigate(`/search?q=${encodeURIComponent(term)}`);
+    setSearchQuery('');
+    setShowSearch(false);
+  };
+
+  const handleSuggestionClick = (productId: string) => {
+    navigate(`/product/${productId}`);
+    setSearchQuery('');
+    setShowSearch(false);
+  };
+
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-4 h-16">
-
           {/* Logo — left */}
           <Link to="/" className="flex items-center shrink-0">
             <MsikaLogo size="md" color="dark" />
           </Link>
 
-          {/* Search bar — center, grows to fill available space */}
-          <form onSubmit={handleSearch} className="hidden sm:flex flex-1 items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden hover:border-[#009739] focus-within:border-[#009739] transition-colors mx-2 px-1.5 py-0.5">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search products, brands, categories…"
-              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 px-2.5 py-2.5 placeholder:text-gray-400"
-            />
-            {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery('')} className="p-2 text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer shrink-0">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button type="submit" className="flex items-center gap-2.5  px-3.5 py-2.5 bg-[#009739] hover:bg-[#007f30] text-white text-xs transition-colors shrink-0 rounded-full border-none cursor-pointer" style={{ fontWeight: 700 }}>
-              <Search className="w-4 h-4" />
-              Search
-            </button>
-          </form>
+          {/* Nav links — inline, desktop only */}
+          <div className="hidden lg:flex items-center gap-5 shrink-0">
+            {navLinks.map(link => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="text-sm transition-colors whitespace-nowrap"
+                style={navLinkStyle(link.to)}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="flex-1" />
 
           {/* Actions — right */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Mobile search icon */}
+            {/* Search trigger */}
             <button
-              onClick={() => setShowSearch(!showSearch)}
-              className="sm:hidden p-2 text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-50"
+              onClick={() => setShowSearch(true)}
+              className="flex items-center gap-1.5 px-4 pr-[50px] py-2 text-gray-600 hover:text-gray-900 transition-colors rounded-full bg-gray-50 border border-gray-200 hover:border-gray-300"
               aria-label="Search"
             >
               <Search className="w-5 h-5" />
+              <span className="hidden sm:inline text-sm" style={{ fontWeight: 500 }}>Search</span>
             </button>
-
 
             {/* Cart */}
             <button
@@ -191,9 +237,12 @@ export const Navbar = () => {
                     aria-expanded={showProfileMenu}
                     aria-label="User menu"
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#009739] flex items-center justify-center text-white" style={{ fontSize: '13px', fontWeight: 700 }}>
-                      {user.name.charAt(0)}
-                    </div>
+                    {user.avatar
+                      ? <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                      : <div className="w-8 h-8 rounded-full bg-[#009739] flex items-center justify-center text-white shrink-0" style={{ fontSize: '13px', fontWeight: 700 }}>
+                          {user.name.charAt(0)}
+                        </div>
+                    }
                     <ChevronDown className="w-3.5 h-3.5 text-gray-400 hidden sm:block" />
                   </button>
 
@@ -205,14 +254,18 @@ export const Navbar = () => {
                           <p className="text-sm text-gray-900" style={{ fontWeight: 600 }}>{user.name}</p>
                           <p className="text-xs text-gray-500 capitalize">{user.role}</p>
                         </div>
-                        {[
-                          { icon: User, label: 'My Profile', path: '/profile' },
-                          { icon: Package, label: 'My Orders', path: '/orders' },
+                        {(user.role === 'seller' ? [
+                          { icon: LayoutDashboard, label: 'Seller Dashboard', path: '/seller-dashboard' },
+                          { icon: Store, label: 'My Store', path: `/store/${(user as any).sellerDbId || ''}` },
+                        ] : user.role === 'admin' ? [
+                          { icon: LayoutDashboard, label: 'Admin Dashboard', path: '/admin-dashboard' },
+                        ] : [
+                          { icon: User, label: 'My Profile', path: '/dashboard?tab=profile' },
+                          { icon: Package, label: 'My Orders', path: '/dashboard?tab=orders' },
+                          { icon: Bell, label: `Notifications${unreadCount > 0 ? ` (${unreadCount})` : ''}`, path: '/dashboard?tab=notifications' },
                           { icon: Heart, label: 'Wishlist', path: '/wishlist' },
                           { icon: ShoppingBag, label: `Cart (${cartItemsCount})`, action: openCart },
-                          ...(user.role === 'seller' ? [{ icon: LayoutDashboard, label: 'Seller Dashboard', path: '/seller-dashboard' }] : []),
-                          ...(user.role === 'admin'  ? [{ icon: LayoutDashboard, label: 'Admin Dashboard',  path: '/admin-dashboard'  }] : []),
-                        ].map(item => (
+                        ]).map(item => (
                           <button
                             key={item.label}
                             onClick={() => {
@@ -260,69 +313,107 @@ export const Navbar = () => {
             {/* Mobile menu toggle */}
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="md:hidden p-2 text-gray-600 hover:text-gray-900"
+              className="lg:hidden p-2 text-gray-600 hover:text-gray-900"
               aria-label="Toggle menu"
             >
               {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
-
-        {/* Nav links row — desktop only */}
-        <div className="hidden md:flex items-center gap-6 pb-2 border-t border-gray-50 pt-1.5">
-          {[
-            { to: '/', label: 'Home' },
-            { to: '/shop', label: 'Browse Products' },
-            { to: '/shops', label: 'Shops' },
-            { to: '/all-categories', label: 'Categories' },
-            ...(user ? [{ to: '/orders', label: 'Orders' }] : []),
-            ...(user?.role === 'seller' ? [{ to: '/seller-dashboard', label: 'Dashboard' }] : []),
-            ...(user?.role === 'admin' ? [{ to: '/admin-dashboard', label: 'Admin' }] : []),
-          ].map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className="text-sm transition-colors whitespace-nowrap"
-              style={navLinkStyle(link.to)}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
       </div>
 
-      {/* Mobile search */}
+      {/* Search modal — slides down over the header, full width, with trending searches */}
       {showSearch && (
-        <div className="sm:hidden border-t border-gray-100 px-4 py-3 bg-white">
-          <form onSubmit={handleSearch} className="flex items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-            <Search className="w-4 h-4 text-gray-400 ml-3 shrink-0" />
-            <input
-              type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search products…"
-              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 px-2.5 py-2.5"
-              autoFocus
-            />
-            {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery('')} className="p-2 text-gray-400 bg-transparent border-none cursor-pointer">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button type="submit" className="px-3 py-2.5 bg-[#009739] text-white text-xs border-none cursor-pointer" style={{ fontWeight: 700 }}>Go</button>
-          </form>
-        </div>
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowSearch(false)} />
+          <div className="absolute inset-x-0 top-0 z-50 bg-white shadow-xl border-b border-gray-100 animate-in slide-in-from-top fade-in-0 duration-300">
+            <div className="w-full px-4 sm:px-6 lg:px-8 py-5">
+              <form onSubmit={handleSearch} className="flex items-center gap-2">
+                <div className="flex flex-1 items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-[#009739] transition-colors px-1.5 py-0.5">
+                  <Search className="w-4 h-4 text-gray-400 ml-2.5 shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search products, brands, categories…"
+                    className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 px-2.5 py-3 placeholder:text-gray-400"
+                  />
+                  {searchQuery && (
+                    <button type="button" onClick={() => setSearchQuery('')} className="p-2 text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer shrink-0">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button type="submit" className="flex items-center gap-2.5 px-3.5 py-2.5 bg-[#009739] hover:bg-[#007f30] text-white text-xs transition-colors shrink-0 rounded-full border-none cursor-pointer" style={{ fontWeight: 700 }}>
+                    <Search className="w-4 h-4" />
+                    <span className="hidden sm:inline">Search</span>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSearch(false)}
+                  className="p-2.5 text-gray-500 hover:text-gray-900 bg-transparent border-none cursor-pointer shrink-0"
+                  aria-label="Close search"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </form>
+
+              {showSuggestions ? (
+                <div className="mt-4">
+                  <div className="text-xs text-gray-400 mb-2.5" style={{ fontWeight: 600 }}>
+                    {suggestionsLoading ? 'Searching…' : suggestions.length > 0 ? 'Products' : `No products found for "${debouncedQuery}"`}
+                  </div>
+                  {suggestions.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                      {suggestions.slice(0, 5).map(product => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => handleSuggestionClick(product.id)}
+                          className="flex flex-col items-start gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left cursor-pointer bg-transparent border-none"
+                        >
+                          <img src={product.image} alt={product.name} className="w-full aspect-square rounded-lg object-cover bg-gray-100" />
+                          <div className="min-w-0 w-full">
+                            <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 500 }}>{product.name}</p>
+                            <p className="text-xs text-gray-400 truncate">{product.category}</p>
+                            <p className="text-sm text-gray-900 mt-0.5" style={{ fontWeight: 700 }}>{formatPrice(product.price)}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : trendingSearches.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-2.5" style={{ fontWeight: 600 }}>
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    Trending searches
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {trendingSearches.map(term => (
+                      <button
+                        key={term}
+                        type="button"
+                        onClick={() => handleTrendingClick(term)}
+                        className="px-3 py-1.5 rounded-full text-xs bg-gray-50 border border-gray-200 text-gray-700 hover:border-[#009739] hover:text-[#009739] transition-colors cursor-pointer"
+                        style={{ fontWeight: 500 }}
+                      >
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Mobile menu */}
       {showMobileMenu && (
-        <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-1">
-          {[
-            { to: '/', label: 'Home' },
-            { to: '/shop', label: 'Browse Products' },
-            { to: '/shops', label: 'Shops' },
-            { to: '/all-categories', label: 'Categories' },
-            ...(user ? [{ to: '/orders', label: 'My Orders' }, { to: '/profile', label: 'My Profile' }] : []),
-            ...(user?.role === 'seller' ? [{ to: '/seller-dashboard', label: '📊 Dashboard' }] : []),
-          ].map(link => (
+        <div className="lg:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-1">
+          {navLinks.map(link => (
             <Link
               key={link.to}
               to={link.to}

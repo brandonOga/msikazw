@@ -7,8 +7,10 @@ import {
   ArrowRight, Loader2, Lock, Shield, Smartphone,
   Truck, UserCircle, Store, MessageCircle, Copy,
   Clock, Zap, Eye, ChevronDown, ChevronUp, Share2,
+  ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PhoneInput, joinPhone, splitPhone } from '../components/PhoneInput';
 
 // ── Payment methods ───────────────────────────────────────────────────────────
 const paymentMethods = [
@@ -143,12 +145,12 @@ function DriverShareModal({
 }) {
   const shareUrl = `${window.location.origin}/driver-tracking/${orderId}`;
   const message = encodeURIComponent(
-    `📦 Msika Delivery Request\n\n` +
+    `Msika Delivery Request\n\n` +
     `Order: #${orderId}\n` +
-    `📍 Pickup: ${pickupLocation}\n` +
-    `🏠 Deliver to: ${deliveryAddress}\n` +
-    `📦 Items: ${productSummary}\n` +
-    `💰 Payment: Secured in Escrow\n\n` +
+    `Pickup: ${pickupLocation}\n` +
+    `Deliver to: ${deliveryAddress}\n` +
+    `Items: ${productSummary}\n` +
+    `Payment: Secured in Escrow\n\n` +
     `Track & accept: ${shareUrl}`
   );
 
@@ -233,10 +235,14 @@ export const CheckoutPage = () => {
   const [selectedPartner, setSelectedPartner] = useState('indrive');
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
+  const [driverPhoneCode, setDriverPhoneCode] = useState('+263');
+  const [driverPhoneNumber, setDriverPhoneNumber] = useState('');
   const [showDriverOTP, setShowDriverOTP] = useState(false);
   const [driverOTP, setDriverOTP] = useState('');
   const [driverVerified, setDriverVerified] = useState(false);
 
+  const [formPhoneCode, setFormPhoneCode] = useState(() => splitPhone(user?.phone || '')[0]);
+  const [formPhoneNumber, setFormPhoneNumber] = useState(() => splitPhone(user?.phone || '')[1]);
   const [form, setForm] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -378,7 +384,7 @@ export const CheckoutPage = () => {
   if (cart.length === 0 && step === 'form') {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
-        <p className="text-3xl mb-3">🛒</p>
+        <ShoppingCart className="w-9 h-9 text-gray-300 mb-3" />
         <h2 className="text-xl text-gray-900 mb-3" style={{ fontWeight: 700 }}>Cart is empty</h2>
         <Link to="/shop" className="px-5 py-2 bg-[#009739] text-white rounded-lg text-sm" style={{ fontWeight: 600 }}>
           Browse products
@@ -556,15 +562,12 @@ export const CheckoutPage = () => {
 
                   <div>
                     <label className="block text-xs text-gray-600 mb-1" style={{ fontWeight: 600 }}>Phone number *</label>
-                    <div className={`flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2.5 border transition-colors ${errors.phone ? 'border-red-400' : 'border-gray-200 focus-within:border-[#009739]'}`}>
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <input
-                        type="tel" value={form.phone}
-                        onChange={e => { setForm(f => ({ ...f, phone: e.target.value })); setErrors(er => ({ ...er, phone: '' })); }}
-                        placeholder="+263 77 123 4567"
-                        className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900"
-                      />
-                    </div>
+                    <PhoneInput
+                      code={formPhoneCode} onCodeChange={setFormPhoneCode}
+                      number={formPhoneNumber}
+                      onNumberChange={v => { setFormPhoneNumber(v); setForm(f => ({ ...f, phone: joinPhone(formPhoneCode, v) })); setErrors(er => ({ ...er, phone: '' })); }}
+                      error={!!errors.phone}
+                    />
                     {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
                   </div>
 
@@ -673,15 +676,12 @@ export const CheckoutPage = () => {
                         </div>
                         <div>
                           <label className="block text-xs text-gray-600 mb-1" style={{ fontWeight: 600 }}>Driver phone number *</label>
-                          <div className={`flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2.5 border transition-colors ${errors.driverPhone ? 'border-red-400' : 'border-gray-200 focus-within:border-[#009739]'}`}>
-                            <Phone className="w-4 h-4 text-gray-400" />
-                            <input
-                              type="tel" value={driverPhone}
-                              onChange={e => { setDriverPhone(e.target.value); setErrors(er => ({ ...er, driverPhone: '' })); setDriverVerified(false); }}
-                              placeholder="+263 77 999 8888"
-                              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900"
-                            />
-                          </div>
+                          <PhoneInput
+                            code={driverPhoneCode} onCodeChange={setDriverPhoneCode}
+                            number={driverPhoneNumber}
+                            onNumberChange={v => { setDriverPhoneNumber(v); setDriverPhone(joinPhone(driverPhoneCode, v)); setErrors(er => ({ ...er, driverPhone: '' })); setDriverVerified(false); }}
+                            error={!!errors.driverPhone}
+                          />
                           {errors.driverPhone && <p className="text-xs text-red-500 mt-1">{errors.driverPhone}</p>}
                         </div>
 

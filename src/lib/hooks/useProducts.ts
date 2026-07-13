@@ -10,6 +10,7 @@ interface UseProductsOptions {
   search?: string;
   limit?: number;
   page?: number;       // 0-based page index (used with limit for pagination)
+  skip?: boolean;       // when true, don't fetch (e.g. query not ready yet)
 }
 
 interface UseProductsResult {
@@ -43,6 +44,11 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
     let cancelled = false;
 
     async function load() {
+      if (options.skip) {
+        if (!cancelled) { setProducts([]); setLoading(false); }
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -86,9 +92,63 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
     load();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options.category, options.search, options.sellerId, options.limit, options.page, tick]);
+  }, [options.category, options.search, options.sellerId, options.limit, options.page, options.skip, tick]);
 
   return { products, loading, error, hasMore, refresh };
+}
+
+// ── useTrendingCategories ────────────────────────────────────────────────────
+
+interface UseTrendingCategoriesResult {
+  categories: string[];
+  loading: boolean;
+}
+
+// Ranks categories by live in-stock product count — no hardcoded list.
+export function useTrendingCategories(limit: number = 6): UseTrendingCategoriesResult {
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+
+      if (!isSupabaseConfigured) {
+        if (!cancelled) { setCategories([]); setLoading(false); }
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('products')
+        .select('category')
+        .eq('in_stock', true);
+
+      if (!cancelled) {
+        if (error || !data) {
+          setCategories([]);
+        } else {
+          const counts = data.reduce<Record<string, number>>((acc, row) => {
+            const cat = row.category as string;
+            if (cat) acc[cat] = (acc[cat] || 0) + 1;
+            return acc;
+          }, {});
+          const ranked = Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, limit)
+            .map(([name]) => name);
+          setCategories(ranked);
+        }
+        setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [limit]);
+
+  return { categories, loading };
 }
 
 // ── useProductById ────────────────────────────────────────────────────────────
@@ -150,9 +210,28 @@ export function useSellers(): UseSellersResult {
         .eq('status', 'approved')
         .order('rating', { ascending: false });
 
+      if (err) {
+        if (!cancelled) { setSellers([]); setError(err.message); setLoading(false); }
+        return;
+      }
+
+      const { data: productRows } = await supabase
+        .from('products')
+        .select('seller_id')
+        .eq('in_stock', true);
+
+      const counts = (productRows || []).reduce<Record<string, number>>((acc, row) => {
+        const sellerId = row.seller_id as string;
+        if (sellerId) acc[sellerId] = (acc[sellerId] || 0) + 1;
+        return acc;
+      }, {});
+
       if (!cancelled) {
-        setSellers(err ? [] : (data || []).map(dbRowToSeller));
-        if (err) setError(err.message);
+        setSellers((data || []).map(row => {
+          const seller = dbRowToSeller(row);
+          seller.productCount = counts[row.id as string] || 0;
+          return seller;
+        }));
         setLoading(false);
       }
     }

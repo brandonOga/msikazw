@@ -30,6 +30,45 @@ export async function fetchQuotations(userId: string): Promise<QuotationRequest[
   }));
 }
 
+// Quotation requests made against this seller's products (requires the
+// "Seller can view quotations for their products" RLS policy).
+export async function fetchSellerQuotations(sellerId: string): Promise<QuotationRequest[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const { data, error } = await supabase
+    .from('quotations')
+    .select('*, products!inner(seller_id)')
+    .eq('products.seller_id', sellerId)
+    .order('created_at', { ascending: false });
+
+  if (error) { console.error('[quotations] fetchSellerQuotations:', error); return []; }
+
+  return (data || []).map(r => ({
+    id: r.id as string,
+    productId: (r.product_id as string) || '',
+    productName: r.product_name as string,
+    productImage: (r.product_image as string) || '',
+    sellerName: (r.seller_name as string) || '',
+    buyerName: r.buyer_name as string,
+    buyerPhone: (r.buyer_phone as string) || '',
+    message: (r.message as string) || '',
+    quantity: Number(r.quantity) || 1,
+    status: (r.status as QuotationRequest['status']) || 'pending',
+    offeredPrice: r.offered_price ? Number(r.offered_price) : undefined,
+    date: new Date(r.created_at as string).toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }),
+  }));
+}
+
+export async function updateQuotationStatus(
+  id: string,
+  status: QuotationRequest['status'],
+): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+  const { error } = await supabase.from('quotations').update({ status }).eq('id', id);
+  if (error) { console.error('[quotations] updateStatus:', error); return false; }
+  return true;
+}
+
 export async function createQuotation(
   userId: string,
   q: Omit<QuotationRequest, 'id' | 'status' | 'date'>,

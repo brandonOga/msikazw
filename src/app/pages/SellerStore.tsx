@@ -6,6 +6,7 @@ import {
   Star, CheckCircle, ChevronLeft, ChevronRight, ChevronDown,
   Search, X, SlidersHorizontal, ArrowRight, MapPin, Clock,
   Send, ThumbsUp, BadgeCheck, MessageCircle, Package,
+  Store as StoreIcon, PackageX,
 } from 'lucide-react';
 import { ProductCard } from '../components/ProductCard';
 import { StarRating } from '../components/StarRating';
@@ -176,7 +177,7 @@ function ShopCard({ s }: { s: { id: string; name: string; logo: string; banner: 
 export function SellerStore() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { sellers } = useSellers();
+  const { sellers, loading: sellersLoading } = useSellers();
   const { products: allProducts } = useProducts({ sellerId: id });
   const seller = sellers.find(s => s.id === id);
   const allSellerProducts = allProducts;
@@ -279,10 +280,19 @@ export function SellerStore() {
     setTimeout(() => setReviewSubmitted(false), 4000);
   };
 
+  if (sellersLoading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 gap-4">
+        <div className="w-10 h-10 border-4 border-[#009739] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500">Loading shop…</p>
+      </div>
+    );
+  }
+
   if (!seller) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-20 text-center">
-        <p className="text-3xl mb-3">🏪</p>
+        <StoreIcon className="w-9 h-9 text-gray-300 mx-auto mb-3" />
         <h2 className="text-xl text-gray-900 mb-3" style={{ fontWeight: 700 }}>Shop not found</h2>
         <button onClick={() => navigate('/')} className="px-5 py-2 bg-[#009739] text-white rounded-lg text-sm border-none cursor-pointer" style={{ fontWeight: 600 }}>
           Back to home
@@ -504,7 +514,7 @@ export function SellerStore() {
 
           {sellerProducts.length === 0 ? (
             <div className="bg-white border border-[#EAEAEA] rounded-2xl p-16 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <p className="text-3xl mb-3">📦</p>
+              <PackageX className="w-9 h-9 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-900 mb-1" style={{ fontSize: '1rem', fontWeight: 700 }}>
                 {hasActiveFilters ? 'No products match your filters' : 'No products listed yet'}
               </p>
@@ -628,7 +638,7 @@ export function SellerStore() {
             <div className="lg:col-span-2 space-y-4">
               {reviews.length === 0 ? (
                 <div className="rounded-2xl border border-[#EAEAEA] p-12 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                  <p className="text-2xl mb-2">💬</p>
+                  <MessageCircle className="w-6 h-6 text-gray-300 mx-auto mb-2" />
                   <p className="text-gray-900" style={{ fontWeight: 700 }}>No reviews yet</p>
                   <p className="text-gray-500 mt-1" style={{ fontSize: '0.85rem' }}>Be the first to share your experience.</p>
                 </div>

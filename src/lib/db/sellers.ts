@@ -89,12 +89,19 @@ export async function updateSeller(sellerId: string, updates: Partial<Seller>) {
       banner_url: updates.banner,
       whatsapp: updates.whatsapp,
       location: updates.location,
+      category: updates.category,
     })
     .eq('id', sellerId)
     .select()
     .single();
 
   if (error) { console.error('[sellers] updateSeller:', error); return null; }
+
+  // Keep profiles.location in sync so the admin Users tab shows it
+  if (updates.location && data?.user_id) {
+    await supabase.from('profiles').update({ location: updates.location }).eq('id', data.user_id);
+  }
+
   return dbRowToSeller(data);
 }
 

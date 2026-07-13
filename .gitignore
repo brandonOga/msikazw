@@ -44,3 +44,9 @@ build/
 # Testing coverage reports
 coverage/
 .nyc_output/
+
+# Claude Code local settings (per-developer, not shared)
+.claude/settings.local.json
+
+# Supabase CLI local link state
+supabase/.temp/

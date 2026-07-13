@@ -8,6 +8,7 @@ import {
   Star, Truck, Plus, Minus, ShoppingBag, Heart, CheckCircle, Clock,
   Shield, Share2, Package, CreditCard, Zap, ChevronRight, ChevronLeft,
   FileText, DollarSign, Loader2, X, Bell, Flame, TrendingUp,
+  PackageX, MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProductCard } from '../components/ProductCard';
@@ -75,7 +76,7 @@ export const ProductPage = () => {
   if (!product) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
-        <p className="text-4xl mb-3">😕</p>
+        <PackageX className="w-10 h-10 text-gray-300 mb-3" />
         <h2 className="text-xl text-gray-900 mb-3" style={{ fontWeight: 700 }}>Product not found</h2>
         <button onClick={() => navigate('/shop')} className="px-6 py-2.5 bg-[#009739] text-white rounded-lg text-sm" style={{ fontWeight: 600 }}>
           Browse products
@@ -581,7 +582,7 @@ export const ProductPage = () => {
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <p className="text-2xl mb-2">💬</p>
+                  <MessageSquare className="w-6 h-6 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm text-gray-500" style={{ fontWeight: 600 }}>No reviews yet</p>
                   <p className="text-xs text-gray-400 mt-1">Be the first to review this product</p>
                 </div>

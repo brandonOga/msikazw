@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import {
   Search, ArrowUpRight, ShoppingBag, Sprout, Sparkles, ArrowRight, X,
   Star, Flame, Tag, TrendingUp, Zap, Shirt, Utensils, Monitor, PawPrint, Home as HomeIcon,
+  SearchX,
 } from 'lucide-react';
 import { products, categories } from '../data/mockData';
 import { Breadcrumbs } from '../components/Breadcrumbs';
@@ -499,7 +500,7 @@ export function AllCategoriesPage() {
 
             {searchResults.length === 0 ? (
               <div className="text-center py-20">
-                <p className="text-4xl mb-4">📂</p>
+                <SearchX className="w-10 h-10 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-900 mb-2" style={{ fontSize: '1.1rem', fontWeight: 700 }}>No categories match</p>
                 <p className="text-gray-500 text-sm mb-6">Try a different search term</p>
                 <button
