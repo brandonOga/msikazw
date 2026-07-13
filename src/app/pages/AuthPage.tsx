@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router';
+import { useNavigate, useSearchParams, useLocation, Link } from 'react-router';
 import { useStore } from '../context/StoreContext';
+import { MsikaLogo } from '../components/MsikaLogo';
 import {
   Store, ShoppingBag, Eye, EyeOff,
   User, Phone, Mail, Lock, Loader2, MailCheck, RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { resendConfirmationEmail } from '../../lib/db/auth';
+import { PhoneInput, joinPhone } from '../components/PhoneInput';
 
 type AuthMode = 'select' | 'login' | 'signup' | 'verify-otp';
 
@@ -38,6 +40,8 @@ export const AuthPage = () => {
   const [otp,           setOtp]           = useState('');
   const [otpError,      setOtpError]      = useState('');
   const [form,          setForm]          = useState({ name: '', phone: '', email: '', password: '', confirmPassword: '' });
+  const [phoneCode,     setPhoneCode]     = useState('+263');
+  const [phoneNumber,   setPhoneNumber]   = useState('');
   const [errors,        setErrors]        = useState<Record<string, string>>({});
 
   const set = (field: string, val: string) => {
@@ -68,8 +72,11 @@ export const AuthPage = () => {
   };
 
   const doRedirectByRole = (role: string) => {
+    if (role === 'admin') {
+      toast.error('Access denied', { description: 'Please use the admin login page.' });
+      return;
+    }
     if (redirect === 'checkout') { navigate('/checkout'); return; }
-    if (role === 'admin')  { navigate('/admin-dashboard'); return; }
     if (role === 'seller') { navigate('/seller-dashboard'); return; }
     navigate('/shop');
   };
@@ -106,7 +113,7 @@ export const AuthPage = () => {
       email: form.email,
       password: form.password,
       name: form.name,
-      phone: form.phone || undefined,
+      phone: joinPhone(phoneCode, phoneNumber) || undefined,
       role: selectedRole,
     });
     setLoading(false);
@@ -229,9 +236,11 @@ export const AuthPage = () => {
       <div className="min-h-[80vh] flex items-center justify-center bg-white py-12 px-4">
         <div className="max-w-md w-full bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
           <div className="text-center mb-7">
-            <div className="mx-auto w-12 h-12 bg-[#009739] rounded-xl flex items-center justify-center mb-4">
-              <Store className="w-6 h-6 text-white" />
-            </div>
+            <Link to="/" className="inline-block mb-4 no-underline">
+              <div className="mx-auto w-12 h-12 bg-[#009739] rounded-xl flex items-center justify-center">
+                <Store className="w-6 h-6 text-white" />
+              </div>
+            </Link>
             <h2 className="text-2xl text-gray-900 mb-1" style={{ fontWeight: 900 }}>Welcome back</h2>
             <p className="text-sm text-gray-500">Sign in to your Msika account</p>
           </div>
@@ -314,9 +323,11 @@ export const AuthPage = () => {
 
           {/* Header */}
           <div className="text-center mb-7">
-            <div className="mx-auto w-12 h-12 bg-[#009739] rounded-xl flex items-center justify-center mb-4">
-              {selectedRole === 'seller' ? <Store className="w-6 h-6 text-white" /> : <ShoppingBag className="w-6 h-6 text-white" />}
-            </div>
+            <Link to="/" className="inline-block mb-4 no-underline">
+              <div className="mx-auto w-12 h-12 bg-[#009739] rounded-xl flex items-center justify-center">
+                {selectedRole === 'seller' ? <Store className="w-6 h-6 text-white" /> : <ShoppingBag className="w-6 h-6 text-white" />}
+              </div>
+            </Link>
             <h2 className="text-2xl text-gray-900 mb-1" style={{ fontWeight: 900 }}>Create your account</h2>
             <p className="text-sm text-gray-500">Join thousands of Zimbabweans on Msika</p>
           </div>
@@ -331,8 +342,8 @@ export const AuthPage = () => {
                 className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-[#009739] cursor-pointer pr-10 transition-colors"
                 style={{ fontWeight: 600 }}
               >
-                <option value="buyer">🛍️ Buyer — Shop &amp; discover products</option>
-                <option value="seller">🏪 Seller — List &amp; sell my products</option>
+                <option value="buyer">Buyer — Shop &amp; discover products</option>
+                <option value="seller">Seller — List &amp; sell my products</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -379,15 +390,12 @@ export const AuthPage = () => {
               <label className="block text-xs text-gray-600 mb-1" style={{ fontWeight: 600 }}>
                 Phone number <span className="text-gray-400">(optional)</span>
               </label>
-              <div className={`flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2.5 border transition-colors ${errors.phone ? 'border-red-400' : 'border-gray-200 focus-within:border-[#009739]'}`}>
-                <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                <input
-                  type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
-                  placeholder="+263 77 123 4567"
-                  className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900"
-                  disabled={loading}
-                />
-              </div>
+              <PhoneInput
+                code={phoneCode} onCodeChange={setPhoneCode}
+                number={phoneNumber} onNumberChange={v => { setPhoneNumber(v); setErrors(er => ({ ...er, phone: '' })); }}
+                error={!!errors.phone}
+                disabled={loading}
+              />
               <FieldError msg={errors.phone} />
             </div>
 

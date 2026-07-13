@@ -102,6 +102,7 @@ export interface User {
   email?: string;
   role: UserRole;
   location?: string;
+  avatar?: string;
 }
 
 export interface CartItem {
@@ -129,7 +130,7 @@ export interface PlacedOrder {
 
 export interface Notification {
   id: string;
-  type: 'order' | 'promo' | 'system';
+  type: 'order' | 'promo' | 'system' | 'quotation';
   title: string;
   body: string;
   time: string;
@@ -153,6 +154,15 @@ function save<T>(key: string, value: T) {
   } catch {
     // storage quota exceeded — fail silently
   }
+}
+
+function timeAgo(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function usePersistedState<T>(key: string, initial: T) {
@@ -214,6 +224,7 @@ interface StoreContextType {
   notifications: Notification[];
   unreadCount: number;
   markAllRead: () => void;
+  markNotificationRead: (id: string) => void;
   addNotification: (n: Omit<Notification, 'id' | 'read' | 'time'>) => void;
 
   quotations: QuotationRequest[];
@@ -292,6 +303,34 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     if (remote.length > 0) setQuotations(remote);
   }, []);
 
+  const syncNotificationsFromSupabase = useCallback(async (userId: string) => {
+    if (!isSupabaseConfigured) return;
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error || !data || data.length === 0) return;
+
+    const remote: Notification[] = data.map(row => ({
+      id: row.id as string,
+      type: (row.type as Notification['type']) || 'system',
+      title: row.title as string,
+      body: row.body as string,
+      time: timeAgo(row.created_at as string),
+      read: Boolean(row.read),
+    }));
+
+    // Merge with any local-only entries (e.g. buyer order toasts) rather than
+    // clobbering them — only notifications ever written to Supabase so far
+    // are server-side ones like this quotation trigger.
+    setNotifications(prev => {
+      const localOnly = prev.filter(n => !remote.some(r => r.id === n.id));
+      return [...remote, ...localOnly];
+    });
+  }, []);
+
   const syncPreOrdersFromSupabase = useCallback(async (userId: string) => {
     if (!isSupabaseConfigured) return;
     const remote = await quotationsDb.fetchPreOrders(userId);
@@ -310,10 +349,14 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     // Upgrade profile role to 'seller' in DB so future logins are correct
     supabase.from('profiles').update({ role: 'seller' }).eq('id', userId).then(() => {});
 
-    // Update local user role immediately
+    // Update local user role and avatar immediately
     setUser(prev => {
-      if (!prev || prev.role === 'seller' || prev.role === 'admin') return prev;
-      const updated = { ...prev, role: 'seller' as UserRole };
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        role: prev.role === 'admin' ? prev.role : 'seller' as UserRole,
+        avatar: (seller as Record<string, unknown>).logo_url as string || prev.avatar,
+      };
       save('user', updated);
       return updated;
     });
@@ -371,7 +414,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
               save('user', updated);
               return updated;
             });
-            toast.success('🎉 Seller account approved!', {
+            toast.success('Seller account approved!', {
               description: 'Your application has been approved. Your store is now live!',
               duration: 6000,
               position: 'bottom-center',
@@ -391,6 +434,34 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
     return () => { supabase.removeChannel(channel); };
   }, [sellerDbId, onboardingStatus]);
+
+  // ── Realtime: new notifications (e.g. seller gets a quotation request) ────
+  useEffect(() => {
+    if (!isSupabaseConfigured || !user) return;
+
+    const channel = supabase
+      .channel(`notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          const newN: Notification = {
+            id: row.id as string,
+            type: (row.type as Notification['type']) || 'system',
+            title: row.title as string,
+            body: row.body as string,
+            time: 'Just now',
+            read: false,
+          };
+          setNotifications(prev => prev.some(n => n.id === newN.id) ? prev : [newN, ...prev]);
+          toast(newN.title, { description: newN.body, position: 'bottom-center' });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
 
   // ── Supabase auth session sync ─────────────────────────────────────────────
   useEffect(() => {
@@ -416,6 +487,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           syncSellerDataFromSupabase(profile.id);
           syncQuotationsFromSupabase(profile.id);
           syncPreOrdersFromSupabase(profile.id);
+          syncNotificationsFromSupabase(profile.id);
         }
       }
       setAuthLoading(false);
@@ -446,6 +518,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           syncSellerDataFromSupabase(profile.id);
           syncQuotationsFromSupabase(profile.id);
           syncPreOrdersFromSupabase(profile.id);
+          syncNotificationsFromSupabase(profile.id);
         }
       }
     });
@@ -655,11 +728,23 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   // ── Notifications ──────────────────────────────────────────────────────────
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    if (user?.id && isSupabaseConfigured) {
+      supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false).then(() => {});
+    }
+  };
 
   const addNotification = (n: Omit<Notification, 'id' | 'read' | 'time'>) => {
     const newN: Notification = { ...n, id: `n_${Date.now()}`, read: false, time: 'Just now' };
     setNotifications(prev => [newN, ...prev]);
+  };
+
+  const markNotificationRead = (id: string) => {
+    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    if (isSupabaseConfigured) {
+      supabase.from('notifications').update({ read: true }).eq('id', id).then(() => {});
+    }
   };
 
   // ── Seller products ────────────────────────────────────────────────────────
@@ -826,7 +911,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       isCartOpen, openCart, closeCart,
       currency, toggleCurrency, formatPrice,
       placedOrders, addPlacedOrder, confirmDelivery, cancelOrder, reorder,
-      notifications, unreadCount, markAllRead, addNotification,
+      notifications, unreadCount, markAllRead, markNotificationRead, addNotification,
       sellerProducts, addSellerProduct, updateSellerProduct, toggleProductStock, removeSellerProduct,
       onboardingStatus, sellerApplication, submitSellerApplication, approveSellerAccount,
       quotations, addQuotation,

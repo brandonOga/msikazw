@@ -7,10 +7,13 @@ import {
 import { useNavigate } from 'react-router';
 import { useStore } from '../context/StoreContext';
 import { toast } from 'sonner';
+import { PhoneInput, joinPhone, splitPhone } from '../components/PhoneInput';
 
 // ── Edit Profile Modal ────────────────────────────────────────────────────────
 function EditProfileModal({ onClose }: { onClose: () => void }) {
   const { user, updateProfile } = useStore();
+  const [phoneCode, setPhoneCode] = useState(() => splitPhone(user?.phone || '')[0]);
+  const [phoneNumber, setPhoneNumber] = useState(() => splitPhone(user?.phone || '')[1]);
   const [form, setForm] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -33,7 +36,7 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
     if (!validate()) return;
     setLoading(true);
     await new Promise(r => setTimeout(r, 900));
-    updateProfile({ name: form.name, phone: form.phone, email: form.email, location: form.location });
+    updateProfile({ name: form.name, phone: joinPhone(phoneCode, phoneNumber), email: form.email, location: form.location });
     setLoading(false);
     setDone(true);
     toast.success('Profile updated!');
@@ -59,7 +62,6 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
             <div className="space-y-3">
               {[
                 { field: 'name', label: 'Full name', placeholder: 'Tatenda Moyo', icon: User, type: 'text' },
-                { field: 'phone', label: 'Phone', placeholder: '+263 77 123 4567', icon: Phone, type: 'tel' },
                 { field: 'email', label: 'Email', placeholder: 'tatenda@example.com', icon: Mail, type: 'email' },
                 { field: 'location', label: 'Location', placeholder: 'Harare, Zimbabwe', icon: MapPin, type: 'text' },
               ].map(({ field, label, placeholder, icon: Icon, type }) => (
@@ -78,6 +80,15 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
                   {(errors as any)[field] && <p className="text-xs text-red-500 mt-1">{(errors as any)[field]}</p>}
                 </div>
               ))}
+              <div>
+                <label className="block text-xs text-gray-600 mb-1" style={{ fontWeight: 600 }}>Phone</label>
+                <PhoneInput
+                  code={phoneCode} onCodeChange={setPhoneCode}
+                  number={phoneNumber} onNumberChange={v => { setPhoneNumber(v); setErrors(er => ({ ...er, phone: '' })); }}
+                  error={!!errors.phone}
+                />
+                {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+              </div>
               <button
                 onClick={save}
                 disabled={loading}

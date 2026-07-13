@@ -1,9 +1,18 @@
 // ─── Types ───────────────────────────────────────────────────────────
 
+import type { LucideIcon } from 'lucide-react';
+import {
+  Shirt, Smartphone, Sparkles, Home, ShoppingBasket, Wheat, Car, Laptop, Wrench,
+  KeyRound, Palette, Recycle, Baby, Dumbbell, BookOpen, HardHat, Waves, Moon,
+  Footprints, Backpack, Glasses, Scissors, Brush, Flower2, BedDouble, ChefHat,
+  PersonStanding, PawPrint, Carrot, Milk, Beef, CupSoda, SprayCan, Croissant,
+  Tv, Gamepad2, Camera, Sofa, LampDesk,
+} from 'lucide-react';
+
 export interface Category {
   id: string;
   name: string;
-  emoji: string;
+  icon: LucideIcon;
   count: number;
 }
 
@@ -89,6 +98,7 @@ export interface SellerApplicationData {
   submittedAt: string;
   documents: string[];
   reviewNotes?: string;
+  logo?: string;
 }
 
 // ─── Dispute Types ────────────────────────────────────────────────────
@@ -123,56 +133,56 @@ export interface Testimonial {
 // ─── Categories (Online Marketplace) ──────────────────────────────────
 
 export const categories: Category[] = [
-  { id: 'c1',  name: 'Fashion & Clothing',      emoji: '👗', count: 120 },
-  { id: 'c2',  name: 'Electronics & Gadgets',   emoji: '📱', count: 95  },
-  { id: 'c3',  name: 'Beauty & Personal Care',  emoji: '💄', count: 85  },
-  { id: 'c4',  name: 'Home & Furniture',        emoji: '🏠', count: 60  },
-  { id: 'c5',  name: 'Food & Groceries',        emoji: '🛒', count: 110 },
-  { id: 'c6',  name: 'Farming & Agriculture',   emoji: '🌾', count: 45  },
-  { id: 'c7',  name: 'Vehicles & Auto Parts',   emoji: '🚗', count: 35  },
-  { id: 'c8',  name: 'Phones & Computers',      emoji: '💻', count: 150 },
-  { id: 'c9',  name: 'Services',                emoji: '🛠️', count: 40  },
-  { id: 'c10', name: 'Property & Rentals',      emoji: '🔑', count: 25  },
-  { id: 'c11', name: 'Handmade & Crafts',       emoji: '🎨', count: 30  },
-  { id: 'c12', name: 'Thrift / Second Hand',    emoji: '👕', count: 80  },
-  { id: 'c13', name: 'Baby Products',           emoji: '👶', count: 50  },
-  { id: 'c14', name: 'Sports & Fitness',        emoji: '⚽', count: 20  },
-  { id: 'c15', name: 'Books & Education',       emoji: '📚', count: 45  },
-  { id: 'c16', name: 'Construction Materials',  emoji: '🧱', count: 15  },
-  { id: 'c17', name: "Women's Dresses",         emoji: '👗', count: 98  },
-  { id: 'c18', name: "Women's Tops",            emoji: '👚', count: 112 },
-  { id: 'c19', name: "Women's Bottoms",         emoji: '👖', count: 76  },
-  { id: 'c20', name: 'Outerwear & Jackets',     emoji: '🧥', count: 54  },
-  { id: 'c21', name: 'Activewear',              emoji: '🏋️', count: 67  },
-  { id: 'c22', name: "Men's Shirts & Tops",     emoji: '👔', count: 89  },
-  { id: 'c23', name: "Men's Shorts & Pants",    emoji: '🩳', count: 61  },
-  { id: 'c24', name: "Kids' Clothing",          emoji: '🧒', count: 73  },
-  { id: 'c25', name: 'Swimwear',                emoji: '👙', count: 42  },
-  { id: 'c26', name: 'Lingerie & Sleepwear',    emoji: '🌙', count: 38  },
-  { id: 'c27', name: 'Heels & Sandals',         emoji: '👠', count: 59  },
-  { id: 'c28', name: 'Backpacks & Luggage',     emoji: '🎒', count: 47  },
-  { id: 'c29', name: 'Sunglasses & Eyewear',    emoji: '🕶️', count: 33  },
-  { id: 'c30', name: 'Hair Care & Wigs',        emoji: '💇', count: 88  },
-  { id: 'c31', name: 'Makeup & Cosmetics',      emoji: '💋', count: 104 },
-  { id: 'c32', name: 'Nail Care',               emoji: '💅', count: 29  },
-  { id: 'c33', name: 'Home Decor',              emoji: '🏡', count: 65  },
-  { id: 'c34', name: 'Bedding & Pillows',       emoji: '🛏️', count: 41  },
-  { id: 'c35', name: 'Kitchen Gadgets',         emoji: '🍳', count: 57  },
-  { id: 'c36', name: 'Yoga & Pilates',          emoji: '🧘', count: 31  },
-  { id: 'c37', name: 'Plus Size Fashion',       emoji: '🌟', count: 82  },
-  { id: 'c38', name: 'Pet Supplies',            emoji: '🐾', count: 36  },
-  { id: 'c39', name: 'Fresh Produce',           emoji: '🥬', count: 65  },
-  { id: 'c40', name: 'Dairy & Eggs',            emoji: '🥛', count: 48  },
-  { id: 'c41', name: 'Meat & Poultry',          emoji: '🥩', count: 42  },
-  { id: 'c42', name: 'Beverages & Drinks',      emoji: '🥤', count: 58  },
-  { id: 'c43', name: 'Household Cleaning',      emoji: '🧹', count: 35  },
-  { id: 'c44', name: 'Bread & Bakery',          emoji: '🍞', count: 30  },
-  { id: 'c45', name: 'Smart TVs & Displays',    emoji: '📺', count: 45  },
-  { id: 'c46', name: 'Gaming & Consoles',       emoji: '🎮', count: 38  },
-  { id: 'c47', name: 'Cameras & Photography',   emoji: '📷', count: 29  },
-  { id: 'c48', name: 'Living Room Furniture',   emoji: '🛋️', count: 52  },
-  { id: 'c49', name: 'Bedroom Furniture',       emoji: '🛏️', count: 44  },
-  { id: 'c50', name: 'Office Furniture',        emoji: '🪑', count: 33  },
+  { id: 'c1',  name: 'Fashion & Clothing',      icon: Shirt,           count: 120 },
+  { id: 'c2',  name: 'Electronics & Gadgets',   icon: Smartphone,      count: 95  },
+  { id: 'c3',  name: 'Beauty & Personal Care',  icon: Sparkles,        count: 85  },
+  { id: 'c4',  name: 'Home & Furniture',        icon: Home,            count: 60  },
+  { id: 'c5',  name: 'Food & Groceries',        icon: ShoppingBasket,  count: 110 },
+  { id: 'c6',  name: 'Farming & Agriculture',   icon: Wheat,           count: 45  },
+  { id: 'c7',  name: 'Vehicles & Auto Parts',   icon: Car,             count: 35  },
+  { id: 'c8',  name: 'Phones & Computers',      icon: Laptop,          count: 150 },
+  { id: 'c9',  name: 'Services',                icon: Wrench,          count: 40  },
+  { id: 'c10', name: 'Property & Rentals',      icon: KeyRound,        count: 25  },
+  { id: 'c11', name: 'Handmade & Crafts',       icon: Palette,         count: 30  },
+  { id: 'c12', name: 'Thrift / Second Hand',    icon: Recycle,         count: 80  },
+  { id: 'c13', name: 'Baby Products',           icon: Baby,            count: 50  },
+  { id: 'c14', name: 'Sports & Fitness',        icon: Dumbbell,        count: 20  },
+  { id: 'c15', name: 'Books & Education',       icon: BookOpen,        count: 45  },
+  { id: 'c16', name: 'Construction Materials',  icon: HardHat,         count: 15  },
+  { id: 'c17', name: "Women's Dresses",         icon: Shirt,           count: 98  },
+  { id: 'c18', name: "Women's Tops",            icon: Shirt,           count: 112 },
+  { id: 'c19', name: "Women's Bottoms",         icon: Shirt,           count: 76  },
+  { id: 'c20', name: 'Outerwear & Jackets',     icon: Shirt,           count: 54  },
+  { id: 'c21', name: 'Activewear',              icon: Dumbbell,        count: 67  },
+  { id: 'c22', name: "Men's Shirts & Tops",     icon: Shirt,           count: 89  },
+  { id: 'c23', name: "Men's Shorts & Pants",    icon: Shirt,           count: 61  },
+  { id: 'c24', name: "Kids' Clothing",          icon: Baby,            count: 73  },
+  { id: 'c25', name: 'Swimwear',                icon: Waves,           count: 42  },
+  { id: 'c26', name: 'Lingerie & Sleepwear',    icon: Moon,            count: 38  },
+  { id: 'c27', name: 'Heels & Sandals',         icon: Footprints,      count: 59  },
+  { id: 'c28', name: 'Backpacks & Luggage',     icon: Backpack,        count: 47  },
+  { id: 'c29', name: 'Sunglasses & Eyewear',    icon: Glasses,         count: 33  },
+  { id: 'c30', name: 'Hair Care & Wigs',        icon: Scissors,        count: 88  },
+  { id: 'c31', name: 'Makeup & Cosmetics',      icon: Sparkles,        count: 104 },
+  { id: 'c32', name: 'Nail Care',               icon: Brush,           count: 29  },
+  { id: 'c33', name: 'Home Decor',              icon: Flower2,         count: 65  },
+  { id: 'c34', name: 'Bedding & Pillows',       icon: BedDouble,       count: 41  },
+  { id: 'c35', name: 'Kitchen Gadgets',         icon: ChefHat,         count: 57  },
+  { id: 'c36', name: 'Yoga & Pilates',          icon: PersonStanding,  count: 31  },
+  { id: 'c37', name: 'Plus Size Fashion',       icon: Shirt,           count: 82  },
+  { id: 'c38', name: 'Pet Supplies',            icon: PawPrint,        count: 36  },
+  { id: 'c39', name: 'Fresh Produce',           icon: Carrot,          count: 65  },
+  { id: 'c40', name: 'Dairy & Eggs',            icon: Milk,            count: 48  },
+  { id: 'c41', name: 'Meat & Poultry',          icon: Beef,            count: 42  },
+  { id: 'c42', name: 'Beverages & Drinks',      icon: CupSoda,         count: 58  },
+  { id: 'c43', name: 'Household Cleaning',      icon: SprayCan,        count: 35  },
+  { id: 'c44', name: 'Bread & Bakery',          icon: Croissant,       count: 30  },
+  { id: 'c45', name: 'Smart TVs & Displays',    icon: Tv,              count: 45  },
+  { id: 'c46', name: 'Gaming & Consoles',       icon: Gamepad2,        count: 38  },
+  { id: 'c47', name: 'Cameras & Photography',   icon: Camera,          count: 29  },
+  { id: 'c48', name: 'Living Room Furniture',   icon: Sofa,            count: 52  },
+  { id: 'c49', name: 'Bedroom Furniture',       icon: BedDouble,       count: 44  },
+  { id: 'c50', name: 'Office Furniture',        icon: LampDesk,        count: 33  },
 ];
 
 // ─── Data arrays (moved to Supabase) ─────────────────────────────────

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router';
-import { Mail, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2, CheckCircle2, Store } from 'lucide-react';
 import { requestPasswordReset } from '../../lib/db/auth';
 
 export const ForgotPassword = () => {
@@ -26,6 +26,13 @@ export const ForgotPassword = () => {
         <Link to="/login" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 mb-6 no-underline">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to login
         </Link>
+        <div className="text-center mb-6">
+          <Link to="/" className="inline-block no-underline">
+            <div className="mx-auto w-12 h-12 bg-[#009739] rounded-xl flex items-center justify-center">
+              <Store className="w-6 h-6 text-white" />
+            </div>
+          </Link>
+        </div>
 
         {sent ? (
           <div className="text-center">

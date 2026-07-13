@@ -97,7 +97,7 @@ function MobileFilterDrawer({ isOpen, onClose, children }: { isOpen: boolean; on
 export const ShopPage = () => {
   const navigate = useNavigate();
   const [search,             setSearch]             = useState('');
-  const [activeCategory,     setActiveCategory]     = useState('All');
+  const [activeCategories,   setActiveCategories]   = useState<string[]>([]);
   const [sortBy,             setSortBy]             = useState('default');
   const [priceRange,         setPriceRange]         = useState('all');
   const [ratingFilter,       setRatingFilter]       = useState('all');
@@ -115,8 +115,12 @@ export const ShopPage = () => {
   const trendingNow = useMemo(() => [...allProducts].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(4, 8), [allProducts]);
   const budgetPicks = useMemo(() => allProducts.filter(p => p.price < 20).slice(0, 4), [allProducts]);
 
-  const hasActiveFilters = activeCategory !== 'All' || sortBy !== 'default' || priceRange !== 'all' || ratingFilter !== 'all' || search.trim() !== '';
-  const activeFilterCount = [activeCategory !== 'All', sortBy !== 'default', priceRange !== 'all', ratingFilter !== 'all'].filter(Boolean).length;
+  const toggleCategory = useCallback((name: string) => {
+    setActiveCategories(prev => prev.includes(name) ? prev.filter(c => c !== name) : [...prev, name]);
+  }, []);
+
+  const hasActiveFilters = activeCategories.length > 0 || sortBy !== 'default' || priceRange !== 'all' || ratingFilter !== 'all' || search.trim() !== '';
+  const activeFilterCount = activeCategories.length + [sortBy !== 'default', priceRange !== 'all', ratingFilter !== 'all'].filter(Boolean).length;
 
   const filteredProducts = useMemo(() => {
     let filtered = [...allProducts];
@@ -128,7 +132,7 @@ export const ShopPage = () => {
         p.sellerName.toLowerCase().includes(q)
       );
     }
-    if (activeCategory !== 'All') filtered = filtered.filter(p => p.category === activeCategory);
+    if (activeCategories.length > 0) filtered = filtered.filter(p => activeCategories.includes(p.category));
     if (priceRange !== 'all') {
       filtered = filtered.filter(p => {
         if (priceRange === 'under-15')  return p.price < 15;
@@ -149,10 +153,10 @@ export const ShopPage = () => {
       case 'new':        return filtered.sort((a) => (a.isNew ? -1 : 1));
       default:           return filtered;
     }
-  }, [allProducts, search, activeCategory, priceRange, ratingFilter, sortBy]);
+  }, [allProducts, search, activeCategories, priceRange, ratingFilter, sortBy]);
 
   const clearFilters = useCallback(() => {
-    setActiveCategory('All');
+    setActiveCategories([]);
     setSortBy('default');
     setPriceRange('all');
     setRatingFilter('all');
@@ -259,23 +263,31 @@ export const ShopPage = () => {
                 <h3 className="text-gray-900" style={{ fontSize: '0.82rem', fontWeight: 700 }}>Categories</h3>
               </div>
               <ul className="max-h-72 overflow-y-auto">
-                {['All', ...categories.map(c => c.name)].map(cat => {
-                  const isActive = cat === activeCategory;
+                {categories.map(cat => {
+                  const isActive = activeCategories.includes(cat.name);
                   return (
-                    <li key={cat}>
-                      <button
-                        onClick={() => { setActiveCategory(cat); setPage(1); }}
-                        className="w-full text-left px-3 py-2 flex items-center gap-2 transition-colors"
-                        style={{
-                          fontSize: '0.8rem',
-                          fontWeight: isActive ? 700 : 400,
-                          background: isActive ? '#f0faf4' : 'transparent',
-                          color: isActive ? '#009739' : '#374151',
-                        }}
+                    <li key={cat.id}>
+                      <label
+                        className="w-full px-3 py-2 flex items-center gap-2.5 cursor-pointer transition-colors"
+                        style={{ background: isActive ? '#f0faf4' : 'transparent' }}
                       >
-                        <span className="flex-1 truncate">{cat}</span>
-                        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#009739] shrink-0" />}
-                      </button>
+                        <input
+                          type="checkbox"
+                          checked={isActive}
+                          onChange={() => { toggleCategory(cat.name); setPage(1); }}
+                          className="accent-[#009739]"
+                        />
+                        <span
+                          className="flex-1 truncate"
+                          style={{
+                            fontSize: '0.8rem',
+                            fontWeight: isActive ? 700 : 400,
+                            color: isActive ? '#009739' : '#374151',
+                          }}
+                        >
+                          {cat.name}
+                        </span>
+                      </label>
                     </li>
                   );
                 })}
@@ -349,12 +361,12 @@ export const ShopPage = () => {
             {/* Sort + active filter chips bar */}
             <div className="flex items-center justify-between gap-3 mb-5 pb-4 border-b border-gray-200">
               <div className="flex items-center gap-2 flex-wrap">
-                {activeCategory !== 'All' && (
-                  <span className="flex items-center gap-1 px-2.5 py-1 bg-[#f0faf4] text-[#009739] rounded-full border border-[#009739]/20" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                    {activeCategory}
-                    <button onClick={() => setActiveCategory('All')} className="p-0 bg-transparent border-none cursor-pointer leading-none"><X className="w-3 h-3" /></button>
+                {activeCategories.map(cat => (
+                  <span key={cat} className="flex items-center gap-1 px-2.5 py-1 bg-[#f0faf4] text-[#009739] rounded-full border border-[#009739]/20" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                    {cat}
+                    <button onClick={() => toggleCategory(cat)} className="p-0 bg-transparent border-none cursor-pointer leading-none"><X className="w-3 h-3" /></button>
                   </span>
-                )}
+                ))}
                 {priceRange !== 'all' && (
                   <span className="flex items-center gap-1 px-2.5 py-1 bg-[#f0faf4] text-[#009739] rounded-full border border-[#009739]/20" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
                     {PRICE_OPTIONS.find(o => o.value === priceRange)?.label}
@@ -501,7 +513,29 @@ export const ShopPage = () => {
         </div>
         <div>
           <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Category</p>
-          <FilterDropdown label="Category" value={activeCategory} onChange={v => { setActiveCategory(v); setPage(1); }} options={[{ label: 'All Categories', value: 'All' }, ...categories.map(c => ({ label: c.name, value: c.name }))]} minWidth="100%" />
+          <ul className="max-h-56 overflow-y-auto rounded-xl border border-gray-200">
+            {categories.map(cat => {
+              const isActive = activeCategories.includes(cat.name);
+              return (
+                <li key={cat.id}>
+                  <label
+                    className="w-full px-3 py-2.5 flex items-center gap-2.5 cursor-pointer transition-colors"
+                    style={{ background: isActive ? '#f0faf4' : 'transparent' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isActive}
+                      onChange={() => { toggleCategory(cat.name); setPage(1); }}
+                      className="accent-[#009739]"
+                    />
+                    <span style={{ fontSize: '0.85rem', fontWeight: isActive ? 700 : 400, color: isActive ? '#009739' : '#374151' }}>
+                      {cat.name}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
         </div>
         <div>
           <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Sort By</p>

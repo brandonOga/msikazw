@@ -348,7 +348,7 @@ export function Categories() {
       case 'popular':    return filtered.sort((a, b) => b.reviewCount - a.reviewCount);
       default:           return filtered;
     }
-  }, [activeCategory, searchQuery, sortBy, priceRange, ratingFilter, searchParams]);
+  }, [products, activeCategory, searchQuery, sortBy, priceRange, ratingFilter, searchParams]);
 
   // â”€â”€ Category-specific product shelves (when a single category is selected) â”€â”€
   const categorySections = useMemo(() => {
@@ -363,7 +363,7 @@ export function Categories() {
       trendingNow: [...categoryProducts].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(0, 4),
       budgetPicks: [...categoryProducts].filter(p => p.price < 20).slice(0, 4),
     };
-  }, [activeCategory]);
+  }, [products, activeCategory]);
 
   // â”€â”€ Per-category rows for the "All" browse view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const allCategoryRows = useMemo(() => {
@@ -378,7 +378,7 @@ export function Categories() {
         return { category: cat, items: sorted.slice(0, 4), total: catProducts.length };
       })
       .filter(Boolean) as { category: typeof categories[0]; items: typeof products; total: number }[];
-  }, [activeCategory]);
+  }, [products, activeCategory]);
 
   // Derived
   const visibleProducts = filteredProducts.slice(0, visibleCount);
@@ -391,7 +391,7 @@ export function Categories() {
       .filter(p => p.rating >= 4.5 && (activeCategory === 'All' || p.category !== activeCategory))
       .sort((a, b) => b.reviewCount - a.reviewCount)
       .slice(0, 4);
-  }, [activeCategory]);
+  }, [products, activeCategory]);
 
   // Recently viewed
   const recentlyViewedProducts = useMemo(() => {
@@ -589,8 +589,8 @@ export function Categories() {
                     <section className="py-6">
                       <div className="flex items-end justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-xl" style={{ background: 'rgba(0,151,57,0.08)' }}>
-                            {row.category.emoji}
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(0,151,57,0.08)' }}>
+                            <row.category.icon className="w-4 h-4" style={{ color: '#009739' }} />
                           </div>
                           <div>
                             <p style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#009739' }}>

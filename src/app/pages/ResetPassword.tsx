@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { Lock, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { useNavigate, Link } from 'react-router';
+import { Lock, Eye, EyeOff, Loader2, CheckCircle2, Store } from 'lucide-react';
 import { updatePassword } from '../../lib/db/auth';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
@@ -56,6 +56,13 @@ export const ResetPassword = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 w-full max-w-sm p-8">
+        <div className="text-center mb-6">
+          <Link to="/" className="inline-block no-underline">
+            <div className="mx-auto w-12 h-12 bg-[#009739] rounded-xl flex items-center justify-center">
+              <Store className="w-6 h-6 text-white" />
+            </div>
+          </Link>
+        </div>
         {done ? (
           <div className="text-center">
             <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">

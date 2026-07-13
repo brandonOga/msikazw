@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { uploadSellerDoc } from '../../lib/storage';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { resendConfirmationEmail } from '../../lib/db/auth';
+import { PhoneInput, joinPhone, splitPhone } from '../components/PhoneInput';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -216,6 +217,8 @@ function StepAccount({
   onNext: () => void; loading: boolean;
 }) {
   const [showPw, setShowPw] = useState(false);
+  const [phoneCode, setPhoneCode] = useState(() => splitPhone(data.phone)[0]);
+  const [phoneNumber, setPhoneNumber] = useState(() => splitPhone(data.phone)[1]);
   const set = (k: keyof AccountData, v: string) => {
     setData({ ...data, [k]: v });
     setErrors({ ...errors, [k]: '' });
@@ -269,7 +272,20 @@ function StepAccount({
   return (
     <div className="space-y-4">
       <InputField label="Full name" value={data.name} onChange={v => set('name', v)} placeholder="Tatenda Moyo" icon={User} error={errors.name} required />
-      <InputField label="Phone number" value={data.phone} onChange={v => set('phone', v)} placeholder="+263 77 123 4567" icon={Phone} error={errors.phone} required hint="This will be your login phone & EcoCash number" />
+      <div>
+        <label className="block text-xs text-gray-700 mb-1.5" style={{ fontWeight: 600 }}>Phone number <span className="text-red-500">*</span></label>
+        <PhoneInput
+          code={phoneCode}
+          onCodeChange={c => { setPhoneCode(c); set('phone', joinPhone(c, phoneNumber)); }}
+          number={phoneNumber}
+          onNumberChange={n => { setPhoneNumber(n); set('phone', joinPhone(phoneCode, n)); }}
+          error={!!errors.phone}
+          inputClassName="rounded-xl py-3"
+          selectClassName="rounded-xl py-3"
+        />
+        {errors.phone && <p className="flex items-center gap-1 text-xs text-red-500 mt-1"><AlertCircle className="w-3 h-3 shrink-0" />{errors.phone}</p>}
+        <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1"><Info className="w-3 h-3" />This will be your login phone &amp; EcoCash number</p>
+      </div>
       <InputField label="Email address" value={data.email} onChange={v => set('email', v)} placeholder="tatenda@example.com" type="email" icon={Mail} hint="Optional — for order confirmations" />
       <div className="relative">
         <InputField label="Password" value={data.password} onChange={v => set('password', v)} placeholder="Min. 6 characters" type={showPw ? 'text' : 'password'} icon={Lock} error={errors.password} required />
@@ -299,11 +315,15 @@ function StepBusiness({
   errors: Record<string, string>; setErrors: (e: Record<string, string>) => void;
   onNext: () => void; onBack: () => void; loading: boolean;
 }) {
+  const [ecoCode, setEcoCode] = useState(() => splitPhone(data.ecocashPhone)[0]);
+  const [ecoNumber, setEcoNumber] = useState(() => splitPhone(data.ecocashPhone)[1]);
+  const [waCode, setWaCode] = useState(() => splitPhone(data.whatsapp)[0]);
+  const [waNumber, setWaNumber] = useState(() => splitPhone(data.whatsapp)[1]);
   const set = (k: keyof BusinessData, v: string) => {
     setData({ ...data, [k]: v });
     setErrors({ ...errors, [k]: '' });
   };
-  const catOptions = categories.map(c => `${c.emoji} ${c.name}`);
+  const catOptions = categories.map(c => c.name);
 
   return (
     <div className="space-y-4">
@@ -332,9 +352,34 @@ function StepBusiness({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <InputField label="EcoCash number" value={data.ecocashPhone} onChange={v => set('ecocashPhone', v)} placeholder="+263 77 123 4567" icon={Phone} error={errors.ecocashPhone} required hint="Where you'll receive payments" />
-        <InputField label="WhatsApp number" value={data.whatsapp} onChange={v => set('whatsapp', v)} placeholder="+263 77 123 4567" icon={MessageCircle} error={errors.whatsapp} required />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-700 mb-1.5" style={{ fontWeight: 600 }}>EcoCash number <span className="text-red-500">*</span></label>
+          <PhoneInput
+            code={ecoCode}
+            onCodeChange={c => { setEcoCode(c); set('ecocashPhone', joinPhone(c, ecoNumber)); }}
+            number={ecoNumber}
+            onNumberChange={n => { setEcoNumber(n); set('ecocashPhone', joinPhone(ecoCode, n)); }}
+            error={!!errors.ecocashPhone}
+            inputClassName="rounded-xl py-3"
+            selectClassName="rounded-xl py-3"
+          />
+          {errors.ecocashPhone && <p className="flex items-center gap-1 text-xs text-red-500 mt-1"><AlertCircle className="w-3 h-3 shrink-0" />{errors.ecocashPhone}</p>}
+          <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1"><Info className="w-3 h-3" />Where you&apos;ll receive payments</p>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-700 mb-1.5" style={{ fontWeight: 600 }}>WhatsApp number <span className="text-red-500">*</span></label>
+          <PhoneInput
+            code={waCode}
+            onCodeChange={c => { setWaCode(c); set('whatsapp', joinPhone(c, waNumber)); }}
+            number={waNumber}
+            onNumberChange={n => { setWaNumber(n); set('whatsapp', joinPhone(waCode, n)); }}
+            error={!!errors.whatsapp}
+            inputClassName="rounded-xl py-3"
+            selectClassName="rounded-xl py-3"
+          />
+          {errors.whatsapp && <p className="flex items-center gap-1 text-xs text-red-500 mt-1"><AlertCircle className="w-3 h-3 shrink-0" />{errors.whatsapp}</p>}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -807,7 +852,7 @@ function StepPending({
       {/* Demo approval button */}
       <div className="p-4 rounded-2xl mb-5" style={{ background: 'rgba(255,209,0,0.08)', border: '1px dashed rgba(255,209,0,0.5)' }}>
         <p className="text-xs text-gray-500 mb-3" style={{ fontWeight: 600 }}>
-          🎬 Demo mode — simulate the approval process
+          Demo mode — simulate the approval process
         </p>
         <button
           onClick={onSimulateApproval}
@@ -1056,7 +1101,7 @@ export function SellerOnboarding() {
     approveSellerAccount();
     setApprovalLoading(false);
     navigate('/seller-dashboard');
-    toast.success('🎉 Application approved!', { description: 'Your seller account is now live.' });
+    toast.success('Application approved!', { description: 'Your seller account is now live.' });
   };
 
   // ── Layout ────────────────────────────────────────────────────────────────

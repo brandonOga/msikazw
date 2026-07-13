@@ -478,7 +478,7 @@ export function SellerProductEdit() {
                   className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#009739]/20 focus:border-[#009739] bg-white ${errors.category ? 'border-red-400' : 'border-gray-300'}`}
                 >
                   <option value="">Select category…</option>
-                  {categories.map(c => <option key={c.id} value={c.name}>{c.emoji} {c.name}</option>)}
+                  {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
                 {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
               </div>
