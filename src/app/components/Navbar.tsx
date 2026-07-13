@@ -119,7 +119,7 @@ export const Navbar = () => {
           </Link>
 
           {/* Nav links — inline, desktop only */}
-          <div className="hidden lg:flex items-center gap-5 shrink-0">
+          <div className="hidden lg:flex items-center gap-5 shrink-0 ml-4">
             {navLinks.map(link => (
               <Link
                 key={link.to}

@@ -585,9 +585,8 @@ export function AllCategoriesPage() {
                 </svg>
                 <span className="text-white/50" style={{ fontSize: '0.88rem' }}>+263 · WhatsApp</span>
               </div>
-              {/* Replace 263771234567 with your real WhatsApp number */}
               <a
-                href="https://wa.me/263771234567"
+                href="https://wa.me/263778108027"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="m-1.5 px-6 py-2.5 bg-[#009739] hover:bg-[#007f30] text-white rounded-lg shrink-0 transition-colors inline-flex items-center gap-2"
