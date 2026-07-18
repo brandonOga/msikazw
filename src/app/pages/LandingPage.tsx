@@ -445,9 +445,9 @@ export const LandingPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               { step: '01', icon: Store,      year: '2025–26', title: 'Onboard 1,000 Sellers',       desc: 'Our first milestone — recruit and verify 1,000 quality Zimbabwean sellers before scaling the platform to all buyers.',             status: 'Active Now',     statusColor: '#009739' },
-              { step: '02', icon: Search,     year: '2026',    title: 'Discover Local Products',      desc: 'A full search experience across verified Zimbabwean sellers — filter by category, city, price, and seller rating.',               status: 'In Development', statusColor: '#FFD100' },
-              { step: '03', icon: CreditCard, year: '2026–27', title: 'EcoCash Escrow Payments',      desc: 'Secure checkout via EcoCash, Innbucks, and OneMoney. Funds held in escrow and released only after confirmed delivery.',          status: 'Planned',        statusColor: '#FFD100' },
-              { step: '04', icon: Package,    year: '2027',    title: 'End-to-End Delivery Tracking', desc: 'Real-time delivery updates via InDrive, DHL, and trusted local couriers — or collect directly from the seller.',                 status: 'Future',         statusColor: '#CE1126' },
+              { step: '02', icon: Search,     year: '2026',    title: 'Discover Local Products',      desc: 'A full search experience across verified Zimbabwean sellers — filter by category, city, price, and seller rating.',               status: 'In Development', statusColor: '#FFFFFF' },
+              { step: '03', icon: CreditCard, year: '2026–27', title: 'EcoCash Escrow Payments',      desc: 'Secure checkout via EcoCash, Innbucks, and OneMoney. Funds held in escrow and released only after confirmed delivery.',          status: 'Planned',        statusColor: '#FFFFFF' },
+              { step: '04', icon: Package,    year: '2027',    title: 'End-to-End Delivery Tracking', desc: 'Real-time delivery updates via InDrive, DHL, and trusted local couriers — or collect directly from the seller.',                 status: 'Future',         statusColor: '#FFFFFF' },
             ].map((item, i) => (
               <div
                 key={item.step}
@@ -457,8 +457,8 @@ export const LandingPage = () => {
                 <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full" style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.06em', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)' }}>
                   {item.year}
                 </span>
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: 'rgba(0,151,57,0.12)', border: '1px dashed rgba(0,151,57,0.3)' }}>
-                  <item.icon className="w-6 h-6" style={{ color: '#009739', opacity: 0.8 }} />
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5">
+                  <item.icon className="w-8 h-8 text-white" style={{ opacity: 0.8 }} />
                 </div>
                 {i < 3 && (
                   <div className="hidden lg:block absolute top-[52px] left-[calc(50%+36px)] right-0 border-t-2 border-dashed border-white/10" />
@@ -525,9 +525,8 @@ export const LandingPage = () => {
                 </svg>
                 <span className="text-white/50" style={{ fontSize: '0.88rem' }}>+263 · WhatsApp</span>
               </div>
-              {/* Replace 263771234567 with your real WhatsApp number */}
               <a
-                href="https://wa.me/263771234567"
+                href="https://wa.me/263778108027"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="m-1.5 px-6 py-2.5 bg-[#009739] hover:bg-[#007f30] text-white rounded-lg shrink-0 transition-colors inline-flex items-center gap-2"

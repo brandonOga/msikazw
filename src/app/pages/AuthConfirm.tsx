@@ -14,12 +14,22 @@ export function AuthConfirm() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    // Recovery emails arrive with access_token in the hash fragment
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    const hashType = hash.get('type');
+    if (hashType === 'recovery') {
+      // Supabase JS picks up the session from the hash automatically;
+      // just send the user to reset-password so they can set a new password.
+      navigate('/reset-password', { replace: true });
+      return;
+    }
+
+    // Email confirmation (signup / magic link) arrives with token_hash as a query param
     const params = new URLSearchParams(window.location.search);
     const tokenHash = params.get('token_hash');
     const type      = params.get('type') as 'email' | 'signup' | null;
 
     if (!tokenHash || !type) {
-      // No token — might be a direct visit; just redirect to login
       navigate('/login', { replace: true });
       return;
     }
@@ -31,7 +41,6 @@ export function AuthConfirm() {
           setMessage(error.message);
         } else {
           setStatus('success');
-          // Brief delay so the user sees the success state, then redirect
           setTimeout(() => navigate('/shop', { replace: true }), 2000);
         }
       });

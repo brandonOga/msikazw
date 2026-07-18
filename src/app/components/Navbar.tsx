@@ -119,7 +119,7 @@ export const Navbar = () => {
           </Link>
 
           {/* Nav links — inline, desktop only */}
-          <div className="hidden lg:flex items-center gap-5 shrink-0">
+          <div className="hidden lg:flex items-center gap-5 shrink-0 ml-4">
             {navLinks.map(link => (
               <Link
                 key={link.to}
@@ -139,7 +139,7 @@ export const Navbar = () => {
             {/* Search trigger */}
             <button
               onClick={() => setShowSearch(true)}
-              className="flex items-center gap-1.5 px-4 pr-[50px] py-2 text-gray-600 hover:text-gray-900 transition-colors rounded-full bg-gray-50 border border-gray-200 hover:border-gray-300"
+              className="flex items-center gap-1.5 p-2 sm:px-4 sm:pr-[50px] sm:py-2 text-gray-600 hover:text-gray-900 transition-colors rounded-full sm:bg-gray-50 sm:border sm:border-gray-200 sm:hover:border-gray-300"
               aria-label="Search"
             >
               <Search className="w-5 h-5" />
@@ -292,7 +292,7 @@ export const Navbar = () => {
                 </div>
               </>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="hidden lg:flex items-center gap-2">
                 <Link
                   to="/login"
                   className="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-700 hover:border-[#009739] hover:text-[#009739] transition-colors bg-white"
