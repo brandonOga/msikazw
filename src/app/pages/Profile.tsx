@@ -210,7 +210,9 @@ function NotifsPanel({ onClose }: { onClose: () => void }) {
 // ── Main Profile Page ─────────────────────────────────────────────────────────
 export function Profile() {
   const navigate = useNavigate();
-  const { user, logout, wishlist, placedOrders, unreadCount } = useStore();
+  const { user, logout, wishlist, placedOrders, unreadCount, onboardingStatus } = useStore();
+  const isSeller = user?.role === 'seller';
+  const isPendingSeller = !isSeller && onboardingStatus === 'pending';
   const [showEdit, setShowEdit] = useState(false);
   const [showAddresses, setShowAddresses] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -244,9 +246,9 @@ export function Profile() {
         { icon: HelpCircle, label: 'Help & FAQ', action: () => toast.info('Help centre', { description: 'Visit help.msika.co.zw' }) },
         {
           icon: Store,
-          label: user?.role === 'seller' ? 'Seller Dashboard' : 'Become a Seller',
-          sub: user?.role === 'seller' ? 'Manage your shop' : 'Open your shop free',
-          path: user?.role === 'seller' ? '/seller-dashboard' : '/seller-onboarding',
+          label: isSeller ? 'Seller Dashboard' : isPendingSeller ? 'Application under review' : 'Become a Seller',
+          sub: isSeller ? 'Manage your shop' : isPendingSeller ? "We'll notify you once reviewed" : 'Open your shop free',
+          path: isSeller || isPendingSeller ? '/seller-dashboard' : '/seller-onboarding',
         },
       ],
     },
@@ -359,7 +361,7 @@ export function Profile() {
             ))}
 
             {/* Become seller CTA */}
-            {user?.role !== 'seller' && (
+            {!isSeller && !isPendingSeller && (
               <div className="bg-[#009739] rounded-xl p-5 flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm text-white" style={{ fontWeight: 800 }}>Open your own shop</p>

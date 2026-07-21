@@ -8,7 +8,7 @@ export async function fetchSellerApplications(): Promise<SellerApplicationData[]
 
   const { data, error } = await supabase
     .from('sellers')
-    .select('id, user_id, business_name, business_type, category, description, whatsapp, city, location, address, status, reference_no, logo_url, created_at, profiles(name, email)')
+    .select('id, user_id, business_name, business_type, category, description, whatsapp, city, location, address, status, reference_no, logo_url, ecocash_phone, created_at, profiles(name, email)')
     // Exclude the system/seed user used to populate demo products
     .neq('user_id', '00000000-0000-0000-0000-000000000000')
     .order('created_at', { ascending: false });
@@ -20,7 +20,7 @@ export async function fetchSellerApplications(): Promise<SellerApplicationData[]
     sellerName:   (row.profiles as unknown as { name: string; email: string } | null)?.name || (row.business_name as string),
     businessName: row.business_name as string,
     email:        (row.profiles as unknown as { name: string; email: string } | null)?.email || '',
-    phone:        (row.whatsapp as string) || '',
+    phone:        (row.ecocash_phone as string) || '',
     whatsapp:     (row.whatsapp as string) || '',
     city:         (row.location as string) || (row.city as string) || '',
     address:      (row.address as string) || '',

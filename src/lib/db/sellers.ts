@@ -63,6 +63,9 @@ export async function submitSellerApplication(
       city: app.city,
       address: app.address,
       reference_no: referenceNumber,
+      ecocash_phone: app.phone,
+      logo_url: app.logoUrl ?? null,
+      banner_url: app.bannerUrl ?? null,
     })
     .select()
     .single();

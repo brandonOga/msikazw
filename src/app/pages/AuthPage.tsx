@@ -4,11 +4,10 @@ import { useStore } from '../context/StoreContext';
 import { MsikaLogo } from '../components/MsikaLogo';
 import {
   Store, ShoppingBag, Eye, EyeOff,
-  User, Phone, Mail, Lock, Loader2, MailCheck, RefreshCw,
+  Mail, Lock, Loader2, MailCheck, RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { resendConfirmationEmail } from '../../lib/db/auth';
-import { PhoneInput, joinPhone } from '../components/PhoneInput';
 
 type AuthMode = 'select' | 'login' | 'signup' | 'verify-otp';
 
@@ -33,15 +32,15 @@ export const AuthPage = () => {
     if (location.pathname === '/signup') setMode('signup');
     else if (location.pathname === '/login') setMode('select');
   }, [location.pathname]);
-  const [selectedRole,  setSelectedRole]  = useState<'buyer' | 'seller'>('buyer');
+  const [selectedRole,  setSelectedRole]  = useState<'buyer' | 'seller'>(
+    searchParams.get('role') === 'seller' ? 'seller' : 'buyer'
+  );
   const [showPassword,  setShowPassword]  = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [resending,     setResending]     = useState(false);
   const [otp,           setOtp]           = useState('');
   const [otpError,      setOtpError]      = useState('');
-  const [form,          setForm]          = useState({ name: '', phone: '', email: '', password: '', confirmPassword: '' });
-  const [phoneCode,     setPhoneCode]     = useState('+263');
-  const [phoneNumber,   setPhoneNumber]   = useState('');
+  const [form,          setForm]          = useState({ email: '', password: '', confirmPassword: '' });
   const [errors,        setErrors]        = useState<Record<string, string>>({});
 
   const set = (field: string, val: string) => {
@@ -60,10 +59,8 @@ export const AuthPage = () => {
 
   const validateSignup = () => {
     const e: Record<string, string> = {};
-    if (!form.name.trim()) e.name = 'Full name is required';
     if (!form.email.trim()) e.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address';
-    if (form.phone.trim() && !/^\+?[\d\s]{7,}$/.test(form.phone.trim())) e.phone = 'Enter a valid phone number (+263...)';
     if (!form.password) e.password = 'Password is required';
     else if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
     if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match';
@@ -112,9 +109,9 @@ export const AuthPage = () => {
     const { error, needsEmailConfirmation } = await signUpWithEmail({
       email: form.email,
       password: form.password,
-      name: form.name,
-      phone: joinPhone(phoneCode, phoneNumber) || undefined,
-      role: selectedRole,
+      // Real seller status only ever comes from an approved application (see
+      // SellerOnboarding.tsx) — never grant it at signup, even if the user picked "Seller" here.
+      role: 'buyer',
     });
     setLoading(false);
     if (error) {
@@ -125,7 +122,7 @@ export const AuthPage = () => {
       setMode('verify-otp');
       return;
     }
-    toast.success('Account created!', { description: `Welcome to Msika, ${form.name}!` });
+    toast.success('Account created!', { description: 'Welcome to Msika!' });
     doRedirect(selectedRole);
   };
 
@@ -136,7 +133,7 @@ export const AuthPage = () => {
     const { error } = await verifyEmailOtp(form.email, otp);
     setLoading(false);
     if (error) { setOtpError('Invalid or expired code. Try resending.'); return; }
-    toast.success('Email verified!', { description: `Welcome to Msika, ${form.name}!` });
+    toast.success('Email verified!', { description: 'Welcome to Msika!' });
     doRedirect(selectedRole);
   };
 
@@ -144,8 +141,12 @@ export const AuthPage = () => {
     setResending(true);
     setOtp('');
     setOtpError('');
-    await resendConfirmationEmail(form.email);
+    const { error } = await resendConfirmationEmail(form.email);
     setResending(false);
+    if (error) {
+      toast.error('Could not resend code', { description: error });
+      return;
+    }
     toast.success('Code resent!', { description: `Check your inbox at ${form.email}` });
   };
 
@@ -355,21 +356,6 @@ export const AuthPage = () => {
 
           {/* Fields */}
           <div className="space-y-4 mb-5">
-            {/* Full name */}
-            <div>
-              <label className="block text-xs text-gray-600 mb-1" style={{ fontWeight: 600 }}>Full name *</label>
-              <div className={`flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2.5 border transition-colors ${errors.name ? 'border-red-400' : 'border-gray-200 focus-within:border-[#009739]'}`}>
-                <User className="w-4 h-4 text-gray-400 shrink-0" />
-                <input
-                  type="text" value={form.name} onChange={e => set('name', e.target.value)}
-                  placeholder="Tatenda Moyo"
-                  className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900"
-                  disabled={loading}
-                />
-              </div>
-              <FieldError msg={errors.name} />
-            </div>
-
             {/* Email */}
             <div>
               <label className="block text-xs text-gray-600 mb-1" style={{ fontWeight: 600 }}>Email address *</label>
@@ -383,20 +369,6 @@ export const AuthPage = () => {
                 />
               </div>
               <FieldError msg={errors.email} />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-xs text-gray-600 mb-1" style={{ fontWeight: 600 }}>
-                Phone number <span className="text-gray-400">(optional)</span>
-              </label>
-              <PhoneInput
-                code={phoneCode} onCodeChange={setPhoneCode}
-                number={phoneNumber} onNumberChange={v => { setPhoneNumber(v); setErrors(er => ({ ...er, phone: '' })); }}
-                error={!!errors.phone}
-                disabled={loading}
-              />
-              <FieldError msg={errors.phone} />
             </div>
 
             {/* Password */}
@@ -433,6 +405,10 @@ export const AuthPage = () => {
               <FieldError msg={errors.confirmPassword} />
             </div>
           </div>
+
+          <p className="text-center text-xs text-gray-400 mb-4">
+            We'll ask for your name{selectedRole === 'seller' ? ' and business details' : ''} next.
+          </p>
 
           {/* CTA */}
           <button

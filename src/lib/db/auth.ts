@@ -4,7 +4,7 @@ import type { UserRole } from '../../app/context/StoreContext';
 export interface SignUpParams {
   email: string;
   password: string;
-  name: string;
+  name?: string;
   phone?: string;
   role: 'buyer' | 'seller';
 }
@@ -63,9 +63,10 @@ export async function getProfile(userId: string) {
   return data as { id: string; name: string; phone: string | null; role: UserRole; location: string | null };
 }
 
-export async function resendConfirmationEmail(email: string) {
-  if (!isSupabaseConfigured) return;
-  await supabase.auth.resend({ type: 'signup', email });
+export async function resendConfirmationEmail(email: string): Promise<{ error: string | null }> {
+  if (!isSupabaseConfigured) return { error: 'Supabase not configured' };
+  const { error } = await supabase.auth.resend({ type: 'signup', email });
+  return { error: error ? error.message : null };
 }
 
 export async function verifyEmailOtp(

@@ -1,30 +1,25 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  User, Store, FileText, Eye, Clock, CheckCircle2,
-  ChevronRight, ChevronLeft, ArrowRight, Loader2,
-  Phone, Mail, MapPin, Lock, AlertCircle, Upload,
-  X, Check, ShieldCheck, Zap, Package, Star,
-  Building2, Hash, MessageCircle, Info, ExternalLink,
-  PartyPopper,
+  User, Store, Eye,
+  ChevronRight, ChevronLeft, Loader2,
+  Phone, MapPin, Lock, AlertCircle, Upload,
+  X, Check, ShieldCheck, Star,
+  Building2, MessageCircle, Info, ExternalLink,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { categories } from '../data/mockData';
 import { toast } from 'sonner';
-import { uploadSellerDoc } from '../../lib/storage';
+import { uploadSellerDoc, uploadSellerImage } from '../../lib/storage';
 import { isSupabaseConfigured } from '../../lib/supabase';
-import { resendConfirmationEmail } from '../../lib/db/auth';
 import { PhoneInput, joinPhone, splitPhone } from '../components/PhoneInput';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Step = 1 | 2 | 3 | 4 | 5 | 6;
+type Step = 1 | 2 | 3 | 4;
 
 interface AccountData {
   name: string;
   phone: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
 }
 
 interface BusinessData {
@@ -46,16 +41,15 @@ interface DocFile {
   url: string | null;     // Supabase Storage URL after upload
   uploading: boolean;
   hint: string;
+  acceptLabel?: string;   // overrides the default "JPG, PNG or PDF" copy shown in the drop zone
 }
 
-// ─── Step metadata (4 steps only — OTP is a sub-step of Account) ─────────────
+// ─── Step metadata ─────────────────────────────────────────────────────────
 const STEPS: { n: Step; label: string; sublabel: string; icon: React.ElementType }[] = [
-  { n: 1, label: 'Account',       sublabel: 'Create your account',      icon: User },
-  { n: 2, label: 'Business',      sublabel: 'About your business',       icon: Store },
-  { n: 3, label: 'Documents',     sublabel: 'Verify your identity',      icon: FileText },
-  { n: 4, label: 'Review',        sublabel: 'Confirm & submit',          icon: Eye },
-  { n: 5, label: 'Submitted',     sublabel: 'Under review',              icon: Clock },
-  { n: 6, label: 'Approved',      sublabel: "You're live!",              icon: CheckCircle2 },
+  { n: 1, label: 'Account',  sublabel: 'Tell us about you',   icon: User },
+  { n: 2, label: 'Business', sublabel: 'About your business', icon: Store },
+  { n: 3, label: 'Branding', sublabel: 'Your store look (optional)', icon: Upload },
+  { n: 4, label: 'Review',   sublabel: 'Confirm & submit',    icon: Eye },
 ];
 
 const BUSINESS_TYPES = [
@@ -216,7 +210,6 @@ function StepAccount({
   errors: Record<string, string>; setErrors: (e: Record<string, string>) => void;
   onNext: () => void; loading: boolean;
 }) {
-  const [showPw, setShowPw] = useState(false);
   const [phoneCode, setPhoneCode] = useState(() => splitPhone(data.phone)[0]);
   const [phoneNumber, setPhoneNumber] = useState(() => splitPhone(data.phone)[1]);
   const set = (k: keyof AccountData, v: string) => {
@@ -224,53 +217,14 @@ function StepAccount({
     setErrors({ ...errors, [k]: '' });
   };
 
-  if (user) {
-    return (
-      <div>
-        <div className="flex items-center gap-3 p-4 rounded-2xl mb-6" style={{ background: 'rgba(0,151,57,0.07)', border: '1px solid rgba(0,151,57,0.2)' }}>
-          <div className="w-11 h-11 rounded-full bg-[#009739] flex items-center justify-center text-white shrink-0" style={{ fontWeight: 800, fontSize: '1.1rem' }}>
-            {user.name.charAt(0)}
-          </div>
-          <div>
-            <p className="text-gray-900" style={{ fontWeight: 700 }}>{user.name}</p>
-            <p className="text-xs text-gray-500">{user.phone}{user.email ? ` · ${user.email}` : ''}</p>
-          </div>
-          <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,151,57,0.12)' }}>
-            <Check className="w-3 h-3 text-[#009739]" />
-            <span className="text-xs text-[#009739]" style={{ fontWeight: 700 }}>Verified</span>
-          </div>
-        </div>
-        <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-          Great news — you're already logged in. Your existing account will be upgraded to a seller account upon approval.
-        </p>
-        <div className="space-y-3 mb-6">
-          {[
-            { icon: Check, text: 'Your existing orders and wishlist will be preserved' },
-            { icon: Check, text: 'You can continue buying while your seller account is reviewed' },
-            { icon: Check, text: 'Seller Dashboard will be unlocked after approval' },
-          ].map(({ icon: Icon, text }) => (
-            <div key={text} className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                <Icon className="w-3 h-3 text-[#009739]" />
-              </div>
-              <p className="text-sm text-gray-600">{text}</p>
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={onNext}
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#009739] hover:bg-[#007f30] text-white rounded-xl text-sm transition-colors border-none cursor-pointer disabled:opacity-60"
-          style={{ fontWeight: 700 }}
-        >
-          Continue with this account <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
+      {user?.email && (
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
+          <Check className="w-3.5 h-3.5 text-[#009739] shrink-0" />
+          <p className="text-xs text-gray-500">Signed in as <span className="text-gray-900" style={{ fontWeight: 600 }}>{user.email}</span></p>
+        </div>
+      )}
       <InputField label="Full name" value={data.name} onChange={v => set('name', v)} placeholder="Tatenda Moyo" icon={User} error={errors.name} required />
       <div>
         <label className="block text-xs text-gray-700 mb-1.5" style={{ fontWeight: 600 }}>Phone number <span className="text-red-500">*</span></label>
@@ -284,16 +238,8 @@ function StepAccount({
           selectClassName="rounded-xl py-3"
         />
         {errors.phone && <p className="flex items-center gap-1 text-xs text-red-500 mt-1"><AlertCircle className="w-3 h-3 shrink-0" />{errors.phone}</p>}
-        <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1"><Info className="w-3 h-3" />This will be your login phone &amp; EcoCash number</p>
+        <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1"><Info className="w-3 h-3" />We&apos;ll use this for order updates and EcoCash payouts</p>
       </div>
-      <InputField label="Email address" value={data.email} onChange={v => set('email', v)} placeholder="tatenda@example.com" type="email" icon={Mail} hint="Optional — for order confirmations" />
-      <div className="relative">
-        <InputField label="Password" value={data.password} onChange={v => set('password', v)} placeholder="Min. 6 characters" type={showPw ? 'text' : 'password'} icon={Lock} error={errors.password} required />
-        <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-8 text-gray-400 border-none bg-transparent cursor-pointer">
-          <Eye className="w-4 h-4" />
-        </button>
-      </div>
-      <InputField label="Confirm password" value={data.confirmPassword} onChange={v => set('confirmPassword', v)} placeholder="Repeat password" type={showPw ? 'text' : 'password'} icon={Lock} error={errors.confirmPassword} required />
       <button
         onClick={onNext}
         disabled={loading}
@@ -301,7 +247,7 @@ function StepAccount({
         style={{ fontWeight: 700 }}
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-        {loading ? 'Creating account…' : <>Create account <ChevronRight className="w-4 h-4" /></>}
+        {loading ? 'Saving…' : <>Continue <ChevronRight className="w-4 h-4" /></>}
       </button>
     </div>
   );
@@ -405,24 +351,27 @@ function StepBusiness({
   );
 }
 
-// ─── Step 3: Documents ────────────────────────────────────────────────────────
+// ─── Reusable drag/drop upload box (docs, logo, banner) ───────────────────────
 export function UploadBox({
-  doc, userId, onUploaded, onRemove,
+  doc, userId, onUploaded, onRemove, onUpload,
 }: {
   doc: DocFile;
   userId?: string;
   onUploaded: (id: string, filename: string | null, url: string | null, uploading?: boolean) => void;
   onRemove: (id: string) => void;
+  // When provided, this is used instead of the default document-upload path — lets the
+  // same drop zone drive any upload target (e.g. logo/banner via uploadSellerImage).
+  onUpload?: (file: File) => Promise<{ url: string | null; error: string | null }>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const MAX_BYTES = 5 * 1024 * 1024; // 5MB
-  const ALLOWED = ['image/jpeg', 'image/png', 'application/pdf'];
+  const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 
   const processFile = async (file: File) => {
     // validate
     if (!ALLOWED.includes(file.type)) {
-      toast.error('Invalid file type. Accepts JPG, PNG or PDF.')
+      toast.error(`Invalid file type. Accepts ${doc.acceptLabel || 'JPG, PNG or PDF'}.`)
       return
     }
     if (file.size > MAX_BYTES) {
@@ -433,7 +382,20 @@ export function UploadBox({
     // mark uploading true and show filename immediately
     onUploaded(doc.id, file.name, null, true);
 
-    if (isSupabaseConfigured && userId) {
+    if (onUpload) {
+      try {
+        const { url, error } = await onUpload(file);
+        if (error) {
+          onUploaded(doc.id, null, null, false);
+          toast.error(`Upload failed: ${error}`);
+          return;
+        }
+        onUploaded(doc.id, file.name, url, false);
+      } catch (err: any) {
+        onUploaded(doc.id, null, null, false);
+        toast.error(`Upload error: ${err?.message || String(err)}`);
+      }
+    } else if (isSupabaseConfigured && userId) {
       try {
         const { url, error } = await uploadSellerDoc(userId, doc.id, file);
         if (error) {
@@ -534,7 +496,7 @@ export function UploadBox({
             <p className="text-sm text-gray-700" style={{ fontWeight: 600 }}>
               {dragging ? 'Drop here' : 'Click to upload'}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">JPG, PNG or PDF · Max 5MB</p>
+            <p className="text-xs text-gray-400 mt-0.5">{doc.acceptLabel || 'JPG, PNG or PDF'} · Max 5MB</p>
           </div>
         </div>
       )}
@@ -549,73 +511,71 @@ export function UploadBox({
   );
 }
 
-function StepDocuments({
-  docs, setDocs, errors, onNext, onBack, loading, userId,
+// ─── Step 3: Branding (optional) ───────────────────────────────────────────────
+function StepBranding({
+  userId, logoUrl, bannerUrl, onLogoChange, onBannerChange, onNext, onBack,
 }: {
-  docs: DocFile[];
-  setDocs: React.Dispatch<React.SetStateAction<DocFile[]>>;
-  errors: Record<string, string>;
-  onNext: () => void; onBack: () => void; loading: boolean;
   userId?: string;
+  logoUrl: string | null; bannerUrl: string | null;
+  onLogoChange: (url: string | null) => void; onBannerChange: (url: string | null) => void;
+  onNext: () => void; onBack: () => void;
 }) {
-  const handleUploaded = (id: string, filename: string | null, url: string | null, uploading = false) => {
-    setDocs(prev => prev.map(d => d.id === id ? { ...d, filename, url, uploading } : d));
-  };
-  const handleRemove = (id: string) => {
-    setDocs(prev => prev.map(d => d.id === id ? { ...d, filename: null, url: null, uploading: false } : d));
-  };
-
-  const uploadedCount = docs.filter(d => d.filename).length;
-  const requiredUploaded = docs.filter(d => d.required && d.filename).length;
-  const requiredTotal = docs.filter(d => d.required).length;
+  const [logoDoc, setLogoDoc] = useState<DocFile>({
+    id: 'logo', label: 'Store logo', required: false,
+    filename: logoUrl ? 'logo.jpg' : null, url: logoUrl, uploading: false,
+    hint: 'Square image works best', acceptLabel: 'JPG, PNG, WEBP or GIF',
+  });
+  const [bannerDoc, setBannerDoc] = useState<DocFile>({
+    id: 'banner', label: 'Store banner', required: false,
+    filename: bannerUrl ? 'banner.jpg' : null, url: bannerUrl, uploading: false,
+    hint: 'Wide image for your store page header', acceptLabel: 'JPG, PNG, WEBP or GIF',
+  });
 
   return (
     <div>
-      {/* Progress */}
-      <div className="flex items-center gap-3 p-3.5 rounded-xl mb-6" style={{ background: 'rgba(0,151,57,0.06)', border: '1px solid rgba(0,151,57,0.12)' }}>
-        <div className="flex-1">
-          <div className="flex justify-between mb-1.5">
-            <p className="text-xs text-gray-700" style={{ fontWeight: 600 }}>Documents uploaded</p>
-            <p className="text-xs text-[#009739]" style={{ fontWeight: 700 }}>{uploadedCount} / {docs.length}</p>
-          </div>
-          <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-            <div className="h-full rounded-full bg-[#009739] transition-all duration-500" style={{ width: `${(uploadedCount / docs.length) * 100}%` }} />
-          </div>
-        </div>
+      <div className="flex items-center gap-2 mb-1">
+        <p className="text-sm text-gray-900" style={{ fontWeight: 700 }}>Store branding</p>
+        <span className="px-2 py-0.5 rounded-full text-[10px]" style={{ background: 'rgba(0,151,57,0.08)', color: '#009739', fontWeight: 700 }}>
+          Optional
+        </span>
       </div>
-
-      {errors.docs && (
-        <div className="flex items-center gap-2 p-3 rounded-xl mb-4 bg-red-50 border border-red-200">
-          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-          <p className="text-xs text-red-600" style={{ fontWeight: 600 }}>{errors.docs}</p>
-        </div>
-      )}
+      <p className="text-xs text-gray-400 mb-5">
+        Add a logo and cover photo now, or skip this and add them anytime from Settings.
+      </p>
 
       <div className="space-y-5">
-        {docs.map(doc => (
-          <UploadBox key={doc.id} doc={doc} userId={userId} onUploaded={handleUploaded} onRemove={handleRemove} />
-        ))}
+        <UploadBox
+          doc={logoDoc}
+          userId={userId}
+          onUpload={file => uploadSellerImage(userId!, 'logo', file)}
+          onUploaded={(_id, filename, url, uploading = false) => {
+            setLogoDoc(d => ({ ...d, filename, url, uploading }));
+            if (!uploading) onLogoChange(url);
+          }}
+          onRemove={() => { setLogoDoc(d => ({ ...d, filename: null, url: null, uploading: false })); onLogoChange(null); }}
+        />
+        <UploadBox
+          doc={bannerDoc}
+          userId={userId}
+          onUpload={file => uploadSellerImage(userId!, 'banner', file)}
+          onUploaded={(_id, filename, url, uploading = false) => {
+            setBannerDoc(d => ({ ...d, filename, url, uploading }));
+            if (!uploading) onBannerChange(url);
+          }}
+          onRemove={() => { setBannerDoc(d => ({ ...d, filename: null, url: null, uploading: false })); onBannerChange(null); }}
+        />
       </div>
 
-      <div className="flex items-start gap-2.5 p-3.5 rounded-xl mt-5 mb-4" style={{ background: 'rgba(255,209,0,0.1)', border: '1px solid rgba(255,209,0,0.3)' }}>
-        <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#b8960a' }} />
-        <p className="text-xs text-gray-600 leading-relaxed">
-          All documents are encrypted and reviewed only by our compliance team within 1–3 business days. We never share your documents with third parties.
-        </p>
-      </div>
-
-      <div className="flex gap-3">
+      <div className="flex gap-3 mt-6">
         <button onClick={onBack} className="flex items-center gap-1.5 px-5 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 cursor-pointer bg-white hover:bg-gray-50 transition-colors" style={{ fontWeight: 600 }}>
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
         <button
           onClick={onNext}
-          disabled={loading}
-          className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#009739] hover:bg-[#007f30] text-white rounded-xl text-sm transition-colors border-none cursor-pointer disabled:opacity-60"
+          className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#009739] hover:bg-[#007f30] text-white rounded-xl text-sm transition-colors border-none cursor-pointer"
           style={{ fontWeight: 700 }}
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          {loading ? 'Processing…' : <>Review application <ChevronRight className="w-4 h-4" /></>}
+          {logoUrl || bannerUrl ? <>Continue <ChevronRight className="w-4 h-4" /></> : 'Skip for now'}
         </button>
       </div>
     </div>
@@ -624,18 +584,18 @@ function StepDocuments({
 
 // ─── Step 4: Review & Submit ──────────────────────────────────────────────────
 function StepReview({
-  accountData, businessData, docs, user,
+  accountData, businessData, logoUrl, bannerUrl, user,
   onSubmit, onBack, loading,
 }: {
   accountData: AccountData; businessData: BusinessData;
-  docs: DocFile[]; user: any;
+  logoUrl: string | null; bannerUrl: string | null;
+  user: any;
   onSubmit: () => void; onBack: () => void; loading: boolean;
 }) {
   const [agreedTerms, setAgreedTerms] = useState(false);
-  const [agreedCommission, setAgreedCommission] = useState(false);
   const [agreedAge, setAgreedAge] = useState(false);
 
-  const allAgreed = agreedTerms && agreedCommission && agreedAge;
+  const allAgreed = agreedTerms && agreedAge;
 
   const name = user?.name || accountData.name;
 
@@ -658,7 +618,7 @@ function StepReview({
             {[
               ['Name', name],
               ['Phone', user?.phone || accountData.phone],
-              ...(user?.email || accountData.email ? [['Email', user?.email || accountData.email]] : []),
+              ...(user?.email ? [['Email', user.email]] : []),
             ].map(([k, v]) => (
               <div key={k}>
                 <p className="text-[11px] text-gray-400">{k}</p>
@@ -702,32 +662,23 @@ function StepReview({
           )}
         </div>
 
-        {/* Documents */}
-        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
+        {/* Branding */}
+        {(logoUrl || bannerUrl) ? (
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center">
-                <FileText className="w-3.5 h-3.5 text-[#009739]" />
+                <Upload className="w-3.5 h-3.5 text-[#009739]" />
               </div>
-              <p className="text-sm text-gray-900" style={{ fontWeight: 700 }}>Documents</p>
+              <p className="text-sm text-gray-900" style={{ fontWeight: 700 }}>Branding</p>
             </div>
-            <span className="text-xs text-[#009739]" style={{ fontWeight: 600 }}>{docs.filter(d => d.filename).length}/{docs.length} uploaded</span>
+            <div className="flex gap-3">
+              {logoUrl && <img src={logoUrl} alt="Store logo" className="w-14 h-14 rounded-xl object-cover border border-gray-200" />}
+              {bannerUrl && <img src={bannerUrl} alt="Store banner" className="flex-1 h-14 rounded-xl object-cover border border-gray-200" />}
+            </div>
           </div>
-          <div className="space-y-1.5">
-            {docs.map(doc => (
-              <div key={doc.id} className="flex items-center gap-2.5">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${doc.filename ? 'bg-[#009739]' : 'bg-gray-200'}`}>
-                  {doc.filename ? <Check className="w-3 h-3 text-white" /> : <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />}
-                </div>
-                <p className="text-xs flex-1" style={{ fontWeight: doc.filename ? 600 : 400, color: doc.filename ? '#374151' : '#9ca3af' }}>
-                  {doc.label}
-                  {doc.required && !doc.filename && <span className="text-red-400 ml-1">(required)</span>}
-                </p>
-                {doc.filename && <p className="text-[11px] text-gray-400 truncate max-w-[120px]">{doc.filename}</p>}
-              </div>
-            ))}
-          </div>
-        </div>
+        ) : (
+          <p className="text-xs text-gray-400">No branding added — you can add a logo and cover photo anytime from Settings.</p>
+        )}
       </div>
 
       {/* Agreements */}
@@ -740,12 +691,6 @@ function StepReview({
             set: setAgreedTerms,
             text: 'I agree to the Msika Seller Terms of Service and Privacy Policy.',
             link: true,
-          },
-          {
-            id: 'commission',
-            checked: agreedCommission,
-            set: setAgreedCommission,
-            text: 'I understand Msika charges a 2% platform fee on all completed sales, deducted before payout.',
           },
           {
             id: 'age',
@@ -788,152 +733,17 @@ function StepReview({
   );
 }
 
-// ─── Step 5: Pending ──────────────────────────────────────────────────────────
-function StepPending({
-  application, onSimulateApproval, approvalLoading,
-}: {
-  application: any; onSimulateApproval: () => void; approvalLoading: boolean;
-}) {
-  return (
-    <div className="text-center">
-      {/* Animated icon */}
-      <div className="relative w-20 h-20 mx-auto mb-6">
-        <div className="w-20 h-20 rounded-full bg-yellow-100 border-4 border-[#FFD100] flex items-center justify-center">
-          <Clock className="w-9 h-9" style={{ color: '#b8960a' }} />
-        </div>
-        <div className="absolute inset-0 rounded-full border-4 border-[#FFD100] opacity-30 animate-ping" />
-      </div>
-
-      <h2 className="text-2xl text-gray-900 mb-2" style={{ fontWeight: 900 }}>Application Submitted!</h2>
-      <p className="text-gray-500 text-sm leading-relaxed mb-6 max-w-sm mx-auto">
-        We've received your seller application and it's currently under review by our compliance team.
-      </p>
-
-      {/* Reference number */}
-      {application && (
-        <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl mb-6" style={{ background: 'rgba(0,151,57,0.07)', border: '1px solid rgba(0,151,57,0.2)' }}>
-          <Hash className="w-4 h-4 text-[#009739]" />
-          <div className="text-left">
-            <p className="text-[11px] text-gray-400">Reference number</p>
-            <p className="text-sm text-gray-900 font-mono" style={{ fontWeight: 700 }}>{application.referenceNumber}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Timeline */}
-      <div className="text-left space-y-0 mb-6 max-w-xs mx-auto">
-        {[
-          { icon: Check,       label: 'Application received',    sublabel: application?.submittedAt || 'Just now',  done: true,   active: false },
-          { icon: Eye,         label: 'Document verification',   sublabel: '1–2 business days',                     done: false,  active: true },
-          { icon: ShieldCheck, label: 'Background check',        sublabel: 'Up to 1 business day',                  done: false,  active: false },
-          { icon: Zap,         label: 'Store activation',        sublabel: 'Instant after approval',                done: false,  active: false },
-        ].map(({ icon: Icon, label, sublabel, done, active }, idx) => (
-          <div key={label} className="flex gap-3">
-            <div className="flex flex-col items-center">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all"
-                style={{
-                  background: done ? '#009739' : active ? 'rgba(255,209,0,0.15)' : '#f3f4f6',
-                  border: active ? '2px solid #FFD100' : done ? 'none' : '2px solid #e5e7eb',
-                }}
-              >
-                <Icon className="w-4 h-4" style={{ color: done ? '#fff' : active ? '#b8960a' : '#d1d5db' }} />
-              </div>
-              {idx < 3 && <div className="w-0.5 h-6 my-0.5" style={{ background: done ? '#009739' : '#e5e7eb' }} />}
-            </div>
-            <div className="pb-1 pt-1.5">
-              <p className="text-sm text-gray-900" style={{ fontWeight: active || done ? 700 : 400 }}>{label}</p>
-              <p className="text-xs text-gray-400">{sublabel}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Demo approval button */}
-      <div className="p-4 rounded-2xl mb-5" style={{ background: 'rgba(255,209,0,0.08)', border: '1px dashed rgba(255,209,0,0.5)' }}>
-        <p className="text-xs text-gray-500 mb-3" style={{ fontWeight: 600 }}>
-          Demo mode — simulate the approval process
-        </p>
-        <button
-          onClick={onSimulateApproval}
-          disabled={approvalLoading}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm border-none cursor-pointer disabled:opacity-60 transition-all"
-          style={{ background: '#FFD100', color: '#111', fontWeight: 700 }}
-        >
-          {approvalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-          {approvalLoading ? 'Processing approval…' : 'Simulate Approval (Demo)'}
-        </button>
-      </div>
-
-      <p className="text-xs text-gray-400 leading-relaxed">
-        You'll receive a notification when your application is reviewed.<br />
-        Keep an eye on the bell icon in your navbar.
-      </p>
-    </div>
-  );
-}
-
-// ─── Step 6: Approved ─────────────────────────────────────────────────────────
-function StepApproved({ businessData, onGoToDashboard }: { businessData: BusinessData; onGoToDashboard: () => void }) {
-  return (
-    <div className="text-center">
-      {/* Celebration icon */}
-      <div className="relative w-24 h-24 mx-auto mb-6">
-        <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center" style={{ border: '4px solid #009739' }}>
-          <CheckCircle2 className="w-11 h-11 text-[#009739]" />
-        </div>
-        <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-[#FFD100] border-2 border-white flex items-center justify-center">
-          <PartyPopper className="w-4 h-4 text-gray-900" />
-        </div>
-      </div>
-
-      <h2 className="text-2xl text-gray-900 mb-1" style={{ fontWeight: 900 }}>You're approved!</h2>
-      <p className="text-[#009739] mb-4" style={{ fontWeight: 700, fontSize: '1rem' }}>
-        Welcome to Msika Sellers, {businessData.businessName || 'Seller'}
-      </p>
-      <p className="text-gray-500 text-sm leading-relaxed mb-8 max-w-sm mx-auto">
-        Your store is now live on Msika Marketplace. Buyers can discover your products and make secure purchases through EcoCash escrow.
-      </p>
-
-      {/* What's unlocked */}
-      <div className="grid grid-cols-1 gap-3 mb-8 text-left">
-        {[
-          { icon: Package,    color: '#009739', bg: 'rgba(0,151,57,0.08)',   title: 'Add unlimited products',    sub: 'List everything in your inventory' },
-          { icon: ShieldCheck,color: '#009739', bg: 'rgba(0,151,57,0.08)',   title: 'Verified Seller badge',     sub: 'Green checkmark on your store' },
-          { icon: Zap,        color: '#b8960a', bg: 'rgba(255,209,0,0.12)', title: 'EcoCash escrow payouts',    sub: 'Funds released within 24hrs of delivery' },
-          { icon: Star,       color: '#CE1126', bg: 'rgba(206,17,38,0.08)', title: 'Priority discovery',        sub: 'Featured in search and categories' },
-        ].map(({ icon: Icon, color, bg, title, sub }) => (
-          <div key={title} className="flex items-center gap-3 p-3.5 rounded-xl bg-gray-50 border border-gray-100">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: bg }}>
-              <Icon className="w-4.5 h-4.5" style={{ width: 18, height: 18, color }} />
-            </div>
-            <div>
-              <p className="text-sm text-gray-900" style={{ fontWeight: 700 }}>{title}</p>
-              <p className="text-xs text-gray-500">{sub}</p>
-            </div>
-            <Check className="w-4 h-4 text-[#009739] ml-auto shrink-0" />
-          </div>
-        ))}
-      </div>
-
-      <button
-        onClick={onGoToDashboard}
-        className="w-full flex items-center justify-center gap-2 py-4 bg-[#009739] hover:bg-[#007f30] text-white rounded-xl text-base transition-colors border-none cursor-pointer"
-        style={{ fontWeight: 800 }}
-      >
-        Go to Seller Dashboard <ArrowRight className="w-5 h-5" />
-      </button>
-      <p className="text-xs text-gray-400 mt-3">
-        Your store is live at msika.co.zw/store/your-store
-      </p>
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function SellerOnboarding() {
   const navigate = useNavigate();
-  const { user, login, signUpWithEmail, verifyEmailOtp, onboardingStatus, sellerApplication, submitSellerApplication, approveSellerAccount } = useStore();
+  const { user, onboardingStatus, submitSellerApplication, updateProfile } = useStore();
+
+  // Onboarding always starts from an authenticated session — sign up (email + password,
+  // with OTP verification) happens on /signup first. Bounce anyone who lands here directly
+  // without an account, rather than re-collecting credentials in this wizard.
+  useEffect(() => {
+    if (!user) navigate('/signup?role=seller', { replace: true });
+  }, [user, navigate]);
 
   const [step, setStep] = useState<Step>(() => {
     if (onboardingStatus === 'approved' || onboardingStatus === 'pending') return 4;
@@ -941,30 +751,18 @@ export function SellerOnboarding() {
   });
   const [maxReached, setMaxReached] = useState<Step>(step);
 
-  // OTP verification state (shown after step 1 account creation)
-  const [showOtp,         setShowOtp]         = useState(false);
-  const [pendingEmail,    setPendingEmail]     = useState('');
-  const [otpValue,        setOtpValue]         = useState('');
-  const [otpError,        setOtpError]         = useState('');
-  const [otpLoading,      setOtpLoading]       = useState(false);
-  const [otpResending,    setOtpResending]     = useState(false);
-
   const [accountData, setAccountData] = useState<AccountData>({
-    name: user?.name || '', phone: user?.phone || '', email: user?.email || '',
-    password: '', confirmPassword: '',
+    name: user?.name || '', phone: user?.phone || '',
   });
   const [businessData, setBusinessData] = useState<BusinessData>({
     businessName: '', businessType: '', category: '', description: '',
     ecocashPhone: user?.phone || '', whatsapp: user?.phone || '',
     city: '', address: '',
   });
-  const [docs, setDocs] = useState<DocFile[]>([
-    { id: 'national-id', label: 'National ID / Passport',  required: true,  filename: null, url: null, uploading: false, hint: 'Clear photo of the front of your ID' },
-    { id: 'selfie',      label: 'Selfie holding your ID',  required: true,  filename: null, url: null, uploading: false, hint: 'Hold your ID next to your face, clearly visible' },
-  ]);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [approvalLoading, setApprovalLoading] = useState(false);
 
   const goTo = (s: Step) => {
     setStep(s);
@@ -974,14 +772,10 @@ export function SellerOnboarding() {
 
   // ── Step 1 validation ─────────────────────────────────────────────────────
   const validateAccount = () => {
-    if (user) return true;
     const e: Record<string, string> = {};
     if (!accountData.name.trim()) e.name = 'Full name is required';
     if (!accountData.phone.trim()) e.phone = 'Phone number is required';
     else if (!/^\+?[\d\s]{7,}$/.test(accountData.phone)) e.phone = 'Enter a valid phone number (+263…)';
-    if (!accountData.password) e.password = 'Password is required';
-    else if (accountData.password.length < 6) e.password = 'Must be at least 6 characters';
-    if (accountData.password !== accountData.confirmPassword) e.confirmPassword = 'Passwords do not match';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -1002,62 +796,13 @@ export function SellerOnboarding() {
     return Object.keys(e).length === 0;
   };
 
-  // ── Step 3 validation ─────────────────────────────────────────────────────
-  const validateDocs = () => {
-    const missingRequired = docs.filter(d => d.required && !d.filename);
-    if (missingRequired.length > 0) {
-      setErrors({ docs: `Please upload: ${missingRequired.map(d => d.label).join(', ')}` });
-      return false;
-    }
-    setErrors({});
-    return true;
-  };
-
   // ── Step handlers ─────────────────────────────────────────────────────────
   const handleStep1Next = async () => {
     if (!validateAccount()) return;
-    if (!user) {
-      setLoading(true);
-      if (isSupabaseConfigured && accountData.email) {
-        const { error, needsEmailConfirmation } = await signUpWithEmail({
-          email: accountData.email, password: accountData.password,
-          name: accountData.name, phone: accountData.phone, role: 'buyer',
-        });
-        setLoading(false);
-        if (error) { toast.error('Sign up failed', { description: error }); return; }
-        if (needsEmailConfirmation) {
-          setPendingEmail(accountData.email);
-          setShowOtp(true);
-          return;
-        }
-      } else {
-        // Offline fallback — skip OTP
-        login('buyer', accountData.name, accountData.phone, accountData.email);
-        setLoading(false);
-      }
-    }
+    setLoading(true);
+    await updateProfile({ name: accountData.name, phone: accountData.phone });
+    setLoading(false);
     goTo(2);
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otpValue.length !== 6) { setOtpError('Enter the 6-digit code'); return; }
-    setOtpLoading(true);
-    setOtpError('');
-    const { error } = await verifyEmailOtp(pendingEmail, otpValue);
-    setOtpLoading(false);
-    if (error) { setOtpError('Invalid or expired code. Try resending.'); return; }
-    toast.success('Email verified!', { description: 'Let\'s set up your store.' });
-    setShowOtp(false);
-    goTo(2);
-  };
-
-  const handleResendOtp = async () => {
-    setOtpResending(true);
-    setOtpValue('');
-    setOtpError('');
-    await resendConfirmationEmail(pendingEmail);
-    setOtpResending(false);
-    toast.success('New code sent!', { description: `Check your inbox at ${pendingEmail}` });
   };
 
   const handleStep2Next = async () => {
@@ -1068,13 +813,7 @@ export function SellerOnboarding() {
     goTo(3);
   };
 
-  const handleStep3Next = async () => {
-    if (!validateDocs()) return;
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 500));
-    setLoading(false);
-    goTo(4);
-  };
+  const handleStep3Next = () => goTo(4);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -1087,25 +826,17 @@ export function SellerOnboarding() {
       city: businessData.city,
       address: businessData.address,
       description: businessData.description,
-      documents: docs.filter(d => d.filename).map(d => d.url || d.filename!),
+      documents: [],
+      logoUrl: logoUrl ?? undefined,
+      bannerUrl: bannerUrl ?? undefined,
     });
     setLoading(false);
     toast.success('Application submitted!', { description: 'Our team will review it shortly.' });
     navigate('/seller-dashboard');
   };
 
-  // Keep for internal use — not shown in UI anymore
-  const handleSimulateApproval = async () => {
-    setApprovalLoading(true);
-    await new Promise(r => setTimeout(r, 2200));
-    approveSellerAccount();
-    setApprovalLoading(false);
-    navigate('/seller-dashboard');
-    toast.success('Application approved!', { description: 'Your seller account is now live.' });
-  };
-
-  // ── Layout ────────────────────────────────────────────────────────────────
-  const isTerminalStep = false; // no more terminal steps — submit goes to dashboard
+  // Redirecting to /signup — render nothing rather than flash Step 1's form.
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -1147,110 +878,30 @@ export function SellerOnboarding() {
           </div>
         </div>
 
-        {/* Progress stepper — hidden during OTP verification */}
-        {!showOtp && (
-          <div className="mb-8">
-            <ProgressStepper current={step} maxReached={maxReached} />
-          </div>
-        )}
+        <div className="mb-8">
+          <ProgressStepper current={step} maxReached={maxReached} />
+        </div>
 
         {/* Step card */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {/* Card header */}
-          {!showOtp && (
-            <div className="px-6 py-5 border-b border-gray-50" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fff 100%)' }}>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#009739] flex items-center justify-center shrink-0">
-                  {React.createElement(STEPS[step - 1].icon, { className: 'w-4 h-4 text-white' })}
-                </div>
-                <div>
-                  <p className="text-gray-900" style={{ fontWeight: 800, fontSize: '1rem' }}>
-                    Step {step}: {STEPS[step - 1].label}
-                  </p>
-                  <p className="text-xs text-gray-500">{STEPS[step - 1].sublabel}</p>
-                </div>
+          <div className="px-6 py-5 border-b border-gray-50" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fff 100%)' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#009739] flex items-center justify-center shrink-0">
+                {React.createElement(STEPS[step - 1].icon, { className: 'w-4 h-4 text-white' })}
+              </div>
+              <div>
+                <p className="text-gray-900" style={{ fontWeight: 800, fontSize: '1rem' }}>
+                  Step {step}: {STEPS[step - 1].label}
+                </p>
+                <p className="text-xs text-gray-500">{STEPS[step - 1].sublabel}</p>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Step content */}
           <div className="p-6">
-            {/* OTP verification — shown inline after step 1 */}
-            {showOtp && (
-              <div className="text-center py-4">
-                <div className="mx-auto w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mb-4" style={{ border: '2px solid #009739' }}>
-                  <Mail className="w-6 h-6 text-[#009739]" />
-                </div>
-                <h3 className="text-lg text-gray-900 mb-1" style={{ fontWeight: 800 }}>Verify your email</h3>
-                <p className="text-sm text-gray-500 mb-1">Enter the 6-digit code sent to</p>
-                <p className="text-sm text-[#009739] mb-6" style={{ fontWeight: 700 }}>{pendingEmail}</p>
-
-                {/* OTP boxes */}
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  {Array.from({ length: 6 }, (_, i) => (
-                    <input
-                      key={i}
-                      id={`sel-otp-${i}`}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={otpValue[i] || ''}
-                      onChange={e => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        const next = otpValue.split('');
-                        next[i] = val.slice(-1);
-                        const joined = next.join('').slice(0, 6);
-                        setOtpValue(joined);
-                        setOtpError('');
-                        if (val && i < 5) (document.getElementById(`sel-otp-${i + 1}`) as HTMLInputElement)?.focus();
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Backspace' && !otpValue[i] && i > 0)
-                          (document.getElementById(`sel-otp-${i - 1}`) as HTMLInputElement)?.focus();
-                      }}
-                      onPaste={e => {
-                        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-                        setOtpValue(pasted);
-                        setOtpError('');
-                        const nextFocus = Math.min(pasted.length, 5);
-                        (document.getElementById(`sel-otp-${nextFocus}`) as HTMLInputElement)?.focus();
-                        e.preventDefault();
-                      }}
-                      className="w-11 h-12 text-center text-xl border-2 rounded-xl outline-none transition-all"
-                      style={{
-                        fontWeight: 800,
-                        borderColor: otpError ? '#CE1126' : otpValue[i] ? '#009739' : '#e5e7eb',
-                        background: otpValue[i] ? 'rgba(0,151,57,0.04)' : '#fafafa',
-                      }}
-                    />
-                  ))}
-                </div>
-
-                {otpError && <p className="text-xs text-red-500 mb-3">{otpError}</p>}
-
-                <button
-                  onClick={handleVerifyOtp}
-                  disabled={otpLoading || otpValue.length !== 6}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#009739] hover:bg-[#007f30] disabled:opacity-60 text-white rounded-xl text-sm border-none cursor-pointer mb-3 transition-colors"
-                  style={{ fontWeight: 700 }}
-                >
-                  {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {otpLoading ? 'Verifying…' : 'Verify & Continue →'}
-                </button>
-
-                <button
-                  onClick={handleResendOtp}
-                  disabled={otpResending}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:border-[#009739] hover:text-[#009739] transition-colors cursor-pointer bg-white disabled:opacity-60"
-                  style={{ fontWeight: 600 }}
-                >
-                  {otpResending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                  {otpResending ? 'Sending…' : 'Resend code'}
-                </button>
-              </div>
-            )}
-
-            {!showOtp && step === 1 && (
+            {step === 1 && (
               <StepAccount
                 user={user}
                 data={accountData}
@@ -1261,7 +912,7 @@ export function SellerOnboarding() {
                 loading={loading}
               />
             )}
-            {!showOtp && step === 2 && (
+            {step === 2 && (
               <StepBusiness
                 data={businessData}
                 setData={setBusinessData}
@@ -1272,22 +923,23 @@ export function SellerOnboarding() {
                 loading={loading}
               />
             )}
-            {!showOtp && step === 3 && (
-              <StepDocuments
-                docs={docs}
-                setDocs={setDocs}
-                errors={errors}
+            {step === 3 && (
+              <StepBranding
+                userId={user?.id}
+                logoUrl={logoUrl}
+                bannerUrl={bannerUrl}
+                onLogoChange={setLogoUrl}
+                onBannerChange={setBannerUrl}
                 onNext={handleStep3Next}
                 onBack={() => goTo(2)}
-                loading={loading}
-                userId={user?.id}
               />
             )}
-            {!showOtp && step === 4 && (
+            {step === 4 && (
               <StepReview
                 accountData={accountData}
                 businessData={businessData}
-                docs={docs}
+                logoUrl={logoUrl}
+                bannerUrl={bannerUrl}
                 user={user}
                 onSubmit={handleSubmit}
                 onBack={() => goTo(3)}
