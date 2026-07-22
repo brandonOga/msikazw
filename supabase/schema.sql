@@ -365,6 +365,10 @@ alter table public.sellers
 alter table public.disputes
   add column if not exists resolution text;
 
+-- ── Migration: seller EcoCash payout number ───────────────────────────────────
+alter table public.sellers
+  add column if not exists ecocash_phone text;
+
 -- ── Seller order access policies ─────────────────────────────────────────────
 -- Allow sellers to view order_items for their own products
 create policy "Seller can view order items for their products"
@@ -497,3 +501,33 @@ $$;
 create or replace trigger on_quotation_status_changed
   after update on public.quotations
   for each row execute procedure public.handle_quotation_status_change();
+
+-- ── Migration: notify admins on new seller application ───────────────────────
+-- Sellers submitting an onboarding application never notified anyone — nothing
+-- wrote to public.notifications for admin user_ids. Add a trigger that does it
+-- server-side (security definer), since RLS forbids a seller's client from
+-- inserting a notification row owned by another user (the admin), and there
+-- can be more than one admin account.
+
+create or replace function public.handle_new_seller_application()
+returns trigger language plpgsql security definer as $$
+begin
+  -- Skip the seed/demo user's sellers (inserted by seed.sql) so re-seeding
+  -- doesn't spam admins with fake application notifications.
+  if new.user_id = '00000000-0000-0000-0000-000000000000' then
+    return new;
+  end if;
+
+  insert into public.notifications (user_id, type, title, body)
+  select id, 'system', 'New Seller Application',
+    new.business_name || ' just applied to become a seller. Review it in the Stores tab.'
+  from public.profiles
+  where role = 'admin';
+
+  return new;
+end;
+$$;
+
+create or replace trigger on_seller_application_created
+  after insert on public.sellers
+  for each row execute procedure public.handle_new_seller_application();

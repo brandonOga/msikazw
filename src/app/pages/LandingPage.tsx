@@ -104,7 +104,7 @@ export const LandingPage = () => {
               </Link>
               {!user && (
                 <Link
-                  to="/seller-onboarding"
+                  to="/signup?role=seller"
                   className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl transition-all"
                   style={{ fontSize: '0.9rem', fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
                 >
@@ -178,7 +178,7 @@ export const LandingPage = () => {
           </button>
 
           <button
-            onClick={() => navigate('/seller-onboarding')}
+            onClick={() => navigate(user ? '/seller-onboarding' : '/signup?role=seller')}
             className="group relative overflow-hidden rounded-2xl text-left p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
             style={{ background: '#111111', minHeight: '260px' }}
           >
@@ -357,7 +357,7 @@ export const LandingPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Early Access — Green */}
           <button
-            onClick={() => navigate('/seller-onboarding')}
+            onClick={() => navigate(user ? '/seller-onboarding' : '/signup?role=seller')}
             className="group relative overflow-hidden rounded-2xl text-left p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
             style={{ background: '#009739', minHeight: '260px' }}
           >
@@ -389,7 +389,7 @@ export const LandingPage = () => {
 
           {/* Verified Store — Dark */}
           <button
-            onClick={() => navigate('/seller-onboarding')}
+            onClick={() => navigate(user ? '/seller-onboarding' : '/signup?role=seller')}
             className="group relative overflow-hidden rounded-2xl text-left p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
             style={{ background: '#111111', minHeight: '260px' }}
           >

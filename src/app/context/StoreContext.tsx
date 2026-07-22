@@ -93,6 +93,8 @@ export interface SellerApplication {
   submittedAt: string;
   documents: string[];
   email?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
 }
 
 export interface User {
@@ -187,7 +189,7 @@ interface StoreContextType {
   sellerDbId: string | null;  // UUID of the seller record in the sellers table
   login: (role: UserRole, name?: string, phone?: string, email?: string) => void;
   loginWithEmail: (email: string, password: string, role: 'buyer' | 'seller') => Promise<{ error: string | null }>;
-  signUpWithEmail: (params: { email: string; password: string; name: string; phone?: string; role: 'buyer' | 'seller' }) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
+  signUpWithEmail: (params: { email: string; password: string; name?: string; phone?: string; role: 'buyer' | 'seller' }) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
   verifyEmailOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
@@ -346,20 +348,34 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     setSellerDbId(seller.id as string);
     save('sellerDbId', seller.id as string);
 
-    // Upgrade profile role to 'seller' in DB so future logins are correct
-    supabase.from('profiles').update({ role: 'seller' }).eq('id', userId).then(() => {});
+    // Only a genuinely approved (or previously-approved-then-suspended) seller should be
+    // treated as role 'seller' — a merely pending/rejected application must never upgrade role.
+    const status = (seller as Record<string, unknown>).status as string;
+    const isApprovedOrSuspended = status === 'approved' || status === 'suspended';
+
+    if (isApprovedOrSuspended) {
+      // Upgrade profile role to 'seller' in DB so future logins are correct
+      supabase.from('profiles').update({ role: 'seller' }).eq('id', userId).then(() => {});
+    }
 
     // Update local user role and avatar immediately
     setUser(prev => {
       if (!prev) return prev;
       const updated = {
         ...prev,
-        role: prev.role === 'admin' ? prev.role : 'seller' as UserRole,
+        role: prev.role === 'admin' ? prev.role : (isApprovedOrSuspended ? 'seller' as UserRole : prev.role),
         avatar: (seller as Record<string, unknown>).logo_url as string || prev.avatar,
       };
       save('user', updated);
       return updated;
     });
+
+    // Mirror the seller's real status locally, so a returning seller on a fresh session/device
+    // sees the correct pending/approved/rejected state instead of defaulting back to 'none'.
+    if (status === 'approved' || status === 'pending' || status === 'rejected') {
+      setOnboardingStatus(status);
+      save('onboardingStatus', status);
+    }
 
     // Load their products
     const prods = await productsDb.fetchProducts({ sellerId: seller.id as string });
@@ -565,7 +581,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUpWithEmail = async (params: {
-    email: string; password: string; name: string; phone?: string; role: 'buyer' | 'seller';
+    email: string; password: string; name?: string; phone?: string; role: 'buyer' | 'seller';
   }): Promise<{ error: string | null; needsEmailConfirmation: boolean }> => {
     if (!isSupabaseConfigured) {
       login(params.role, params.name, params.phone || '', params.email);
@@ -824,6 +840,18 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             console.warn('Failed to send seller email:', res.status, body);
           }
         }).catch(err => console.warn('Send seller email error', err));
+
+        // Notify admins (email) that a new application needs review — non-blocking
+        fetch('/api/notify-admins-new-seller', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ businessName: application.businessName, referenceNumber }),
+        }).then(async res => {
+          if (!res.ok) {
+            const body = await res.text();
+            console.warn('Failed to notify admins:', res.status, body);
+          }
+        }).catch(err => console.warn('Notify admins error', err));
       }
     } catch (err) {
       console.warn('Error triggering seller email', err);
