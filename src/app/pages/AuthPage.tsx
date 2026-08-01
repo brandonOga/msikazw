@@ -309,7 +309,10 @@ export const AuthPage = () => {
           </p>
 
           <p className="text-center text-[11px] text-gray-400">
-            By continuing, you agree to Msika's Terms of Service and Privacy Policy.
+            By continuing, you agree to Msika's{' '}
+            <Link to="/terms" className="underline hover:text-[#009739] transition-colors">Terms of Service</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="underline hover:text-[#009739] transition-colors">Privacy Policy</Link>.
           </p>
         </div>
       </div>
@@ -436,7 +439,10 @@ export const AuthPage = () => {
           </p>
 
           <p className="text-center text-[11px] text-gray-400 mt-4">
-            By signing up, you agree to Msika's Terms of Service and Privacy Policy.
+            By signing up, you agree to Msika's{' '}
+            <Link to="/terms" className="underline hover:text-[#009739] transition-colors">Terms of Service</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="underline hover:text-[#009739] transition-colors">Privacy Policy</Link>.
           </p>
         </div>
       </div>

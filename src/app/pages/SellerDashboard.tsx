@@ -1102,9 +1102,9 @@ export function SellerDashboard() {
               </div>
 
               {/* Revenue sparkline + quick actions */}
-              <div className="grid grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {/* Sparkline */}
-                <div className="col-span-2 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <div className="md:col-span-2 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <div className="flex items-center justify-between mb-5">
                     <div>
                       <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Revenue Trend</p>
@@ -1200,7 +1200,7 @@ export function SellerDashboard() {
           {tab === 'products' && (
             <div className="flex flex-col gap-5">
               {/* Stats strip */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: 'Total', value: sellerProducts.length, color: '#111' },
                   { label: 'In Stock', value: inStockCount, color: '#009739' },
@@ -1258,7 +1258,7 @@ export function SellerDashboard() {
                     </button>
                   </div>
                 ) : productView === 'grid' ? (
-                  <div className="p-5 grid grid-cols-3 gap-4">
+                  <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredProducts.map(p => (
                       <div key={p.id} className="border border-[#EAEAEA] rounded-2xl overflow-hidden hover:shadow-md transition-shadow" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                         <div className="relative" style={{ height: 140 }}>
@@ -1469,7 +1469,7 @@ export function SellerDashboard() {
               </div>
 
               {/* Earnings breakdown */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: 'Gross Revenue', value: formatPrice(totalSales), sub: 'Before platform fee', color: '#111' },
                   { label: 'Platform Fee (2%)', value: `-${formatPrice(platformFee)}`, sub: 'Deducted by Msika', color: '#CE1126' },
@@ -1489,40 +1489,44 @@ export function SellerDashboard() {
                   <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Payment Status by Order</p>
                   <p className="text-xs text-gray-400">All transactions via EcoCash Escrow</p>
                 </div>
-                {/* Table header */}
-                <div className="px-6 py-2.5 bg-gray-50 border-b border-[#EAEAEA] grid grid-cols-6 gap-4">
-                  {['Order', 'Product', 'Date', 'Amount', 'Fee', 'Status'].map(h => (
-                    <p key={h} className="text-gray-400" style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</p>
-                  ))}
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {allOrders.map(order => {
-                    const status = getStatus(order.orderId, order.escrowStatus);
-                    const gross = order.price * order.quantity;
-                    const fee = gross * 0.02;
-                    return (
-                      <div key={order.id} className="px-6 py-4 grid grid-cols-6 gap-4 items-center hover:bg-gray-50/50 transition-colors">
-                        <p className="text-gray-600 font-mono" style={{ fontSize: '0.75rem', fontWeight: 600 }}>#{order.orderId}</p>
-                        <div className="flex items-center gap-2 min-w-0">
-                          <img src={order.productImage} alt="" className="w-7 h-7 rounded-lg object-cover shrink-0" />
-                          <p className="text-gray-800 truncate" style={{ fontSize: '0.78rem', fontWeight: 600 }}>{order.productName}</p>
-                        </div>
-                        <p className="text-gray-400" style={{ fontSize: '0.75rem' }}>{order.date}</p>
-                        <p style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111' }}>{formatPrice(gross)}</p>
-                        <p style={{ fontWeight: 600, fontSize: '0.78rem', color: '#CE1126' }}>-{formatPrice(fee)}</p>
-                        <div className="flex items-center gap-2">
-                          <StatusBadge status={status} />
-                          {status === 'delivery_confirmed' && (
-                            <button onClick={() => updateOrderStatus(order.orderId, 'released')}
-                              className="text-[10px] px-2 py-0.5 rounded-full bg-[#009739] text-white border-none cursor-pointer"
-                              style={{ fontWeight: 700 }}>
-                              Release
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="overflow-x-auto">
+                  <div className="min-w-[560px]">
+                    {/* Table header */}
+                    <div className="px-6 py-2.5 bg-gray-50 border-b border-[#EAEAEA] grid grid-cols-6 gap-4">
+                      {['Order', 'Product', 'Date', 'Amount', 'Fee', 'Status'].map(h => (
+                        <p key={h} className="text-gray-400" style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</p>
+                      ))}
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                      {allOrders.map(order => {
+                        const status = getStatus(order.orderId, order.escrowStatus);
+                        const gross = order.price * order.quantity;
+                        const fee = gross * 0.02;
+                        return (
+                          <div key={order.id} className="px-6 py-4 grid grid-cols-6 gap-4 items-center hover:bg-gray-50/50 transition-colors">
+                            <p className="text-gray-600 font-mono" style={{ fontSize: '0.75rem', fontWeight: 600 }}>#{order.orderId}</p>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <img src={order.productImage} alt="" className="w-7 h-7 rounded-lg object-cover shrink-0" />
+                              <p className="text-gray-800 truncate" style={{ fontSize: '0.78rem', fontWeight: 600 }}>{order.productName}</p>
+                            </div>
+                            <p className="text-gray-400" style={{ fontSize: '0.75rem' }}>{order.date}</p>
+                            <p style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111' }}>{formatPrice(gross)}</p>
+                            <p style={{ fontWeight: 600, fontSize: '0.78rem', color: '#CE1126' }}>-{formatPrice(fee)}</p>
+                            <div className="flex items-center gap-2">
+                              <StatusBadge status={status} />
+                              {status === 'delivery_confirmed' && (
+                                <button onClick={() => updateOrderStatus(order.orderId, 'released')}
+                                  className="text-[10px] px-2 py-0.5 rounded-full bg-[#009739] text-white border-none cursor-pointer"
+                                  style={{ fontWeight: 700 }}>
+                                  Release
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1545,7 +1549,7 @@ export function SellerDashboard() {
           {tab === 'analytics' && (
             <div className="flex flex-col gap-5">
               {/* KPI row */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { label: 'Total Revenue', value: formatPrice(totalSales), icon: DollarSign, color: '#009739', bg: 'rgba(0,151,57,0.08)', sub: 'All time' },
                   { label: 'Orders Completed', value: String(allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'released').length), icon: CheckCircle2, color: '#009739', bg: 'rgba(0,151,57,0.08)', sub: 'Released' },
@@ -1564,9 +1568,9 @@ export function SellerDashboard() {
               </div>
 
               {/* Charts row */}
-              <div className="grid grid-cols-5 gap-5">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
                 {/* Revenue area chart */}
-                <div className="col-span-3 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <div className="lg:col-span-3 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Monthly Revenue</p>
@@ -1595,7 +1599,7 @@ export function SellerDashboard() {
                 </div>
 
                 {/* Category bar chart */}
-                <div className="col-span-2 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <div className="lg:col-span-2 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <p className="text-gray-900 mb-1" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Revenue by Category</p>
                   <p className="text-gray-400 text-xs mb-5">Top performing segments</p>
                   <ResponsiveContainer width="100%" height={220}>
@@ -1617,7 +1621,7 @@ export function SellerDashboard() {
               {/* Order fulfillment funnel */}
               <div className="bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                 <p className="text-gray-900 mb-5" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Order Fulfillment Pipeline</p>
-                <div className="grid grid-cols-6 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                   {STATUS_FLOW.map((s) => {
                     const count = allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === s).length;
                     const m = ESCROW_META[s];

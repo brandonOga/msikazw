@@ -856,7 +856,8 @@ export const CheckoutPage = () => {
                   }
                 </button>
                 <p className="text-[11px] text-gray-400 text-center mt-2">
-                  By placing your order you agree to our terms.
+                  By placing your order you agree to our{' '}
+                  <Link to="/terms" className="underline hover:text-[#009739] transition-colors">Terms of Service</Link>.
                 </p>
               </div>
             </div>

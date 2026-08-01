@@ -315,7 +315,7 @@ export const AdminDashboard = () => {
       </aside>
 
       {/* ── Main ── */}
-      <main className="md:ml-64 p-4 md:p-8">
+      <main className="md:ml-64 p-4 md:p-8 pt-4">
 
         {/* ── OVERVIEW ── */}
         {view === 'overview' && (
@@ -386,7 +386,7 @@ export const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Orders summary */}
               <div className="bg-white rounded-xl border border-[#EAEAEA] p-5" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                 <p className="text-sm text-gray-900 mb-4" style={{ fontWeight: 700 }}>Order Status Split</p>
@@ -494,40 +494,44 @@ export const AdminDashboard = () => {
         {view === 'stores' && !selectedApp && (
           <div>
             <h2 className="text-gray-900 mb-6" style={{ fontSize: '1.4rem', fontWeight: 800 }}>Stores &amp; Listings</h2>
-            <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
                 {(['all', 'pending', 'approved', 'suspended'] as StoreFilter[]).map(f => (
-                  <button key={f} onClick={() => setStoreFilter(f)} className={`${filterTabCls(storeFilter === f)} capitalize`} style={{ fontWeight: storeFilter === f ? 700 : 500 }}>
+                  <button key={f} onClick={() => setStoreFilter(f)} className={`${filterTabCls(storeFilter === f)} capitalize whitespace-nowrap`} style={{ fontWeight: storeFilter === f ? 700 : 500 }}>
                     {f} ({f === 'all' ? applications.length : f === 'pending' ? pendingCount : f === 'approved' ? approvedCount : suspendedCount})
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-2 border border-[#EAEAEA] rounded-xl px-3 py-2 bg-white" style={{ width: 220 }}>
-                <Search className="w-3.5 h-3.5 text-gray-400" />
-                <input value={storeSearch} onChange={e => setStoreSearch(e.target.value)} placeholder="Search stores…" className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900" />
+              <div className="flex items-center gap-2 border border-[#EAEAEA] rounded-xl px-3 py-2 bg-white w-full sm:w-auto" style={{ minWidth: 0 }}>
+                <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <input value={storeSearch} onChange={e => setStoreSearch(e.target.value)} placeholder="Search stores…" className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 min-w-0" />
               </div>
             </div>
             <div className="border border-[#EAEAEA] rounded-xl overflow-hidden bg-white" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid grid-cols-6 gap-4">
-                {['Store', 'Owner', 'Location', 'Category', 'Status', 'Actions'].map(h => <TH key={h} label={h} />)}
-              </div>
-              {filteredStores.length === 0 ? (
-                <EmptyState icon={Store} title="No stores found" sub="Try adjusting your search or filter." />
-              ) : filteredStores.map(app => (
-                <div key={app.id} className="px-5 py-4 grid grid-cols-6 gap-4 items-center border-b border-[#EAEAEA] last:border-0 hover:bg-gray-50/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    {app.logo ? <img src={app.logo} alt={app.businessName} className="w-8 h-8 rounded-full object-cover shrink-0" /> : <div className="w-8 h-8 rounded-full bg-[#009739] flex items-center justify-center text-white shrink-0" style={{ fontWeight: 700, fontSize: '0.75rem' }}>{app.businessName.charAt(0)}</div>}
-                    <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 600 }}>{app.businessName}</p>
+              <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
+                  <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid grid-cols-6 gap-4">
+                    {['Store', 'Owner', 'Location', 'Category', 'Status', 'Actions'].map(h => <TH key={h} label={h} />)}
                   </div>
-                  <p className="text-sm text-gray-700 truncate">{app.sellerName}</p>
-                  <p className="text-sm text-gray-500">{app.city || '—'}</p>
-                  <p className="text-xs text-gray-500 truncate">{app.category || '—'}</p>
-                  <span className={`px-2.5 py-1 rounded-full text-xs capitalize w-fit ${appStatusCls(app.status)}`} style={{ fontWeight: 700 }}>{app.status}</span>
-                  <button onClick={() => setSelectedApp(app)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[#009739] hover:bg-[#009739]/5 transition-colors border-none bg-transparent cursor-pointer" style={{ fontWeight: 600 }}>
-                    <Eye className="w-3.5 h-3.5" /> Review
-                  </button>
+                  {filteredStores.length === 0 ? (
+                    <EmptyState icon={Store} title="No stores found" sub="Try adjusting your search or filter." />
+                  ) : filteredStores.map(app => (
+                    <div key={app.id} className="px-5 py-4 grid grid-cols-6 gap-4 items-center border-b border-[#EAEAEA] last:border-0 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        {app.logo ? <img src={app.logo} alt={app.businessName} className="w-8 h-8 rounded-full object-cover shrink-0" /> : <div className="w-8 h-8 rounded-full bg-[#009739] flex items-center justify-center text-white shrink-0" style={{ fontWeight: 700, fontSize: '0.75rem' }}>{app.businessName.charAt(0)}</div>}
+                        <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 600 }}>{app.businessName}</p>
+                      </div>
+                      <p className="text-sm text-gray-700 truncate">{app.sellerName}</p>
+                      <p className="text-sm text-gray-500">{app.city || '—'}</p>
+                      <p className="text-xs text-gray-500 truncate">{app.category || '—'}</p>
+                      <span className={`px-2.5 py-1 rounded-full text-xs capitalize w-fit ${appStatusCls(app.status)}`} style={{ fontWeight: 700 }}>{app.status}</span>
+                      <button onClick={() => setSelectedApp(app)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[#009739] hover:bg-[#009739]/5 transition-colors border-none bg-transparent cursor-pointer" style={{ fontWeight: 600 }}>
+                        <Eye className="w-3.5 h-3.5" /> Review
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         )}
@@ -607,40 +611,44 @@ export const AdminDashboard = () => {
         {view === 'users' && (
           <div>
             <h2 className="text-gray-900 mb-6" style={{ fontSize: '1.4rem', fontWeight: 800 }}>Users</h2>
-            <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
                 {([
                   { id: 'all' as UserFilter, label: `All (${users.length})` },
                   { id: 'buyer' as UserFilter, label: `Buyers (${users.filter(u => u.role === 'buyer').length})` },
                   { id: 'seller' as UserFilter, label: `Sellers (${users.filter(u => u.role === 'seller').length})` },
                   { id: 'admin' as UserFilter, label: `Admins (${users.filter(u => u.role === 'admin').length})` },
                 ]).map(f => (
-                  <button key={f.id} onClick={() => setUserFilter(f.id)} className={filterTabCls(userFilter === f.id)} style={{ fontWeight: userFilter === f.id ? 700 : 500 }}>{f.label}</button>
+                  <button key={f.id} onClick={() => setUserFilter(f.id)} className={`${filterTabCls(userFilter === f.id)} whitespace-nowrap`} style={{ fontWeight: userFilter === f.id ? 700 : 500 }}>{f.label}</button>
                 ))}
               </div>
-              <div className="flex items-center gap-2 border border-[#EAEAEA] rounded-xl px-3 py-2 bg-white" style={{ width: 220 }}>
-                <Search className="w-3.5 h-3.5 text-gray-400" />
-                <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Search users…" className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900" />
+              <div className="flex items-center gap-2 border border-[#EAEAEA] rounded-xl px-3 py-2 bg-white w-full sm:w-auto" style={{ minWidth: 0 }}>
+                <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Search users…" className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 min-w-0" />
               </div>
             </div>
             <div className="border border-[#EAEAEA] rounded-xl overflow-hidden bg-white" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid grid-cols-5 gap-4">
-                {['Name', 'Email', 'Location', 'Role', 'Joined'].map(h => <TH key={h} label={h} />)}
-              </div>
-              {filteredUsers.length === 0 ? (
-                <EmptyState icon={Users} title="No users found" sub={userSearch ? 'No users match your search.' : 'Registered users will appear here.'} />
-              ) : filteredUsers.map(u => (
-                <div key={u.id} className="px-5 py-4 grid grid-cols-5 gap-4 items-center border-b border-[#EAEAEA] last:border-0 hover:bg-gray-50/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#009739] flex items-center justify-center text-white shrink-0" style={{ fontWeight: 700, fontSize: '0.75rem' }}>{u.name.charAt(0)}</div>
-                    <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 600 }}>{u.name}</p>
+              <div className="overflow-x-auto">
+                <div className="min-w-[560px]">
+                  <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid grid-cols-5 gap-4">
+                    {['Name', 'Email', 'Location', 'Role', 'Joined'].map(h => <TH key={h} label={h} />)}
                   </div>
-                  <p className="text-sm text-gray-500 truncate">{u.email || '—'}</p>
-                  <p className="text-sm text-gray-500">{u.city || '—'}</p>
-                  <span className={`px-2.5 py-1 rounded-full text-xs capitalize w-fit ${userRoleCls(u.role)}`} style={{ fontWeight: 700 }}>{u.role}</span>
-                  <p className="text-xs text-gray-400">{u.createdAt}</p>
+                  {filteredUsers.length === 0 ? (
+                    <EmptyState icon={Users} title="No users found" sub={userSearch ? 'No users match your search.' : 'Registered users will appear here.'} />
+                  ) : filteredUsers.map(u => (
+                    <div key={u.id} className="px-5 py-4 grid grid-cols-5 gap-4 items-center border-b border-[#EAEAEA] last:border-0 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-[#009739] flex items-center justify-center text-white shrink-0" style={{ fontWeight: 700, fontSize: '0.75rem' }}>{u.name.charAt(0)}</div>
+                        <p className="text-sm text-gray-900 truncate" style={{ fontWeight: 600 }}>{u.name}</p>
+                      </div>
+                      <p className="text-sm text-gray-500 truncate">{u.email || '—'}</p>
+                      <p className="text-sm text-gray-500">{u.city || '—'}</p>
+                      <span className={`px-2.5 py-1 rounded-full text-xs capitalize w-fit ${userRoleCls(u.role)}`} style={{ fontWeight: 700 }}>{u.role}</span>
+                      <p className="text-xs text-gray-400">{u.createdAt}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         )}
@@ -649,32 +657,36 @@ export const AdminDashboard = () => {
         {view === 'orders' && (
           <div>
             <h2 className="text-gray-900 mb-6" style={{ fontSize: '1.4rem', fontWeight: 800 }}>Orders &amp; Escrow</h2>
-            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 mb-5 w-fit">
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 mb-5 overflow-x-auto">
               {([
                 { id: 'all' as OrderFilter, label: `All (${orders.length})` },
                 { id: 'held' as OrderFilter, label: 'Escrow Held' },
                 { id: 'released' as OrderFilter, label: 'Released' },
                 { id: 'disputed' as OrderFilter, label: 'Disputed' },
               ]).map(f => (
-                <button key={f.id} onClick={() => setOrderFilter(f.id)} className={filterTabCls(orderFilter === f.id)} style={{ fontWeight: orderFilter === f.id ? 700 : 500 }}>{f.label}</button>
+                <button key={f.id} onClick={() => setOrderFilter(f.id)} className={`${filterTabCls(orderFilter === f.id)} whitespace-nowrap`} style={{ fontWeight: orderFilter === f.id ? 700 : 500 }}>{f.label}</button>
               ))}
             </div>
             <div className="border border-[#EAEAEA] rounded-xl overflow-hidden bg-white" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid gap-4" style={{ gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 1fr 1fr' }}>
-                {['Order ID', 'Buyer', 'Seller', 'Amount', 'Status', 'Escrow'].map(h => <TH key={h} label={h} />)}
-              </div>
-              {filteredOrders.length === 0 ? (
-                <EmptyState icon={ShoppingBag} title="No orders found" sub={orderFilter !== 'all' ? 'No orders match this filter.' : 'Orders from your marketplace will appear here.'} />
-              ) : filteredOrders.map(o => (
-                <div key={o.id} className="px-5 py-4 grid gap-4 items-center border-b border-[#EAEAEA] last:border-0 hover:bg-gray-50/50 transition-colors" style={{ gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 1fr 1fr' }}>
-                  <p className="text-sm text-gray-900 font-mono truncate" style={{ fontWeight: 700 }}>{o.id.slice(0, 8)}…</p>
-                  <p className="text-sm text-gray-700 truncate">{o.buyer}</p>
-                  <p className="text-sm text-gray-700 truncate">{o.seller}</p>
-                  <p className="text-sm text-gray-900" style={{ fontWeight: 600 }}>${o.amount.toFixed(2)}</p>
-                  <span className={`px-2.5 py-1 rounded-full text-xs capitalize w-fit ${orderStatusCls(o.status)}`} style={{ fontWeight: 700 }}>{o.status}</span>
-                  <span className="px-2.5 py-1 rounded-full text-xs capitalize w-fit text-gray-600 bg-gray-100" style={{ fontWeight: 700 }}>{o.escrowStatus.replace(/_/g, ' ')}</span>
+              <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
+                  <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid gap-4" style={{ gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 1fr 1fr' }}>
+                    {['Order ID', 'Buyer', 'Seller', 'Amount', 'Status', 'Escrow'].map(h => <TH key={h} label={h} />)}
+                  </div>
+                  {filteredOrders.length === 0 ? (
+                    <EmptyState icon={ShoppingBag} title="No orders found" sub={orderFilter !== 'all' ? 'No orders match this filter.' : 'Orders from your marketplace will appear here.'} />
+                  ) : filteredOrders.map(o => (
+                    <div key={o.id} className="px-5 py-4 grid gap-4 items-center border-b border-[#EAEAEA] last:border-0 hover:bg-gray-50/50 transition-colors" style={{ gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 1fr 1fr' }}>
+                      <p className="text-sm text-gray-900 font-mono truncate" style={{ fontWeight: 700 }}>{o.id.slice(0, 8)}…</p>
+                      <p className="text-sm text-gray-700 truncate">{o.buyer}</p>
+                      <p className="text-sm text-gray-700 truncate">{o.seller}</p>
+                      <p className="text-sm text-gray-900" style={{ fontWeight: 600 }}>${o.amount.toFixed(2)}</p>
+                      <span className={`px-2.5 py-1 rounded-full text-xs capitalize w-fit ${orderStatusCls(o.status)}`} style={{ fontWeight: 700 }}>{o.status}</span>
+                      <span className="px-2.5 py-1 rounded-full text-xs capitalize w-fit text-gray-600 bg-gray-100" style={{ fontWeight: 700 }}>{o.escrowStatus.replace(/_/g, ' ')}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         )}
@@ -684,6 +696,8 @@ export const AdminDashboard = () => {
           <div>
             <h2 className="text-gray-900 mb-6" style={{ fontSize: '1.4rem', fontWeight: 800 }}>Dispute Resolution</h2>
             <div className="border border-[#EAEAEA] rounded-xl overflow-hidden bg-white" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
               <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid grid-cols-6 gap-4">
                 {['Order', 'Buyer', 'Seller', 'Reason', 'Status', 'Actions'].map(h => <TH key={h} label={h} />)}
               </div>
@@ -701,6 +715,8 @@ export const AdminDashboard = () => {
                   </button>
                 </div>
               ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -764,7 +780,7 @@ export const AdminDashboard = () => {
         {view === 'payouts' && (
           <div>
             <h2 className="text-gray-900 mb-6" style={{ fontSize: '1.4rem', fontWeight: 800 }}>Payouts &amp; Currency</h2>
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               {[
                 { label: 'Pending Payouts', value: '$0.00' },
                 { label: 'Paid this Month', value: '$0.00' },
@@ -780,10 +796,14 @@ export const AdminDashboard = () => {
               ))}
             </div>
             <div className="border border-[#EAEAEA] rounded-xl overflow-hidden bg-white" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid gap-4" style={{ gridTemplateColumns: '1.6fr 1.3fr 1fr 1.1fr 130px' }}>
-                {['Seller', 'Requested', 'Currency', 'Status', ''].map((h, i) => <TH key={i} label={h} />)}
+              <div className="overflow-x-auto">
+                <div className="min-w-[500px]">
+                  <div className="px-5 py-3 bg-gray-50 border-b border-[#EAEAEA] grid gap-4" style={{ gridTemplateColumns: '1.6fr 1.3fr 1fr 1.1fr 130px' }}>
+                    {['Seller', 'Requested', 'Currency', 'Status', ''].map((h, i) => <TH key={i} label={h} />)}
+                  </div>
+                  <EmptyState icon={CreditCard} title="No pending payouts" sub="Payout requests from sellers will appear here." />
+                </div>
               </div>
-              <EmptyState icon={CreditCard} title="No pending payouts" sub="Payout requests from sellers will appear here." />
             </div>
           </div>
         )}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import {
   User, Store, Eye,
   ChevronRight, ChevronLeft, Loader2,
@@ -709,7 +709,7 @@ function StepReview({
             </div>
             <p className="text-xs text-gray-600 leading-relaxed" style={{ fontWeight: 500 }}>
               {text}
-              {link && <button className="text-[#009739] ml-1 underline bg-transparent border-none cursor-pointer p-0 text-xs" onClick={e => { e.preventDefault(); toast.info('Terms of Service', { description: 'Opening seller terms…' }); }}>View Terms</button>}
+              {link && <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-[#009739] ml-1 underline text-xs">View Terms</Link>}
             </p>
           </label>
         ))}
