@@ -2,13 +2,14 @@ import { Outlet } from 'react-router';
 import { Toaster } from 'sonner';
 import { StoreProvider } from './context/StoreContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { DashboardHeader, HEADER_H } from './components/DashboardHeader';
 
+// The buyer dashboard renders its own single-row header (logo + tabs + profile
+// menu) inline in BuyerDashboard.tsx, matching the mockup's combined header —
+// no separate fixed DashboardHeader here, unlike Seller/Admin layouts.
 export const BuyerLayout = () => {
   return (
     <StoreProvider>
-      <div className="min-h-screen bg-gray-50" style={{ paddingTop: HEADER_H }}>
-        <DashboardHeader role="buyer" />
+      <div className="min-h-screen bg-gray-50">
         <ErrorBoundary>
           <Outlet />
         </ErrorBoundary>

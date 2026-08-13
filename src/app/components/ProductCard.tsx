@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Heart, ShoppingBasket, Star } from 'lucide-react';
+import { Heart, ShoppingBasket, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product, sellers, getSmartBadge, isProductNew } from '../data/mockData';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router';
@@ -63,7 +63,7 @@ export function ProductCard({ product, showQuickAdd = true }: ProductCardProps) 
   };
 
   return (
-    <article className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+    <article className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full">
       {/* Image area */}
       <div
         className="relative bg-gray-100 overflow-hidden select-none"
@@ -112,31 +112,48 @@ export function ProductCard({ product, showQuickAdd = true }: ProductCardProps) 
           />
         </button>
 
-        {/* Carousel dots */}
         {allImages.length > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
-            {allImages.map((_, i) => (
-              <button
-                key={i}
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); goTo(i); }}
-                className="transition-all duration-200"
-                style={{
-                  width: i === activeIdx ? '16px' : '6px',
-                  height: '6px',
-                  borderRadius: '9999px',
-                  background: i === activeIdx ? '#111827' : '#D1D5DB',
-                  border: 'none',
-                  padding: 0,
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <button
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); goTo(activeIdx - 1); }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm hover:bg-white border border-gray-200"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); goTo(activeIdx + 1); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm hover:bg-white border border-gray-200"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
+              {allImages.map((_, i) => (
+                <button
+                  key={i}
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); goTo(i); }}
+                  className="transition-all duration-200"
+                  style={{
+                    width: i === activeIdx ? '16px' : '6px',
+                    height: '6px',
+                    borderRadius: '9999px',
+                    background: i === activeIdx ? '#111827' : '#D1D5DB',
+                    border: 'none',
+                    padding: 0,
+                  }}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
       {/* Card body */}
-      <div className="flex flex-col gap-2 p-4">
+      <div className="flex flex-col flex-1 gap-2 p-4">
         {/* Name */}
         <h3
           className="font-bold text-gray-900 text-base leading-tight line-clamp-1 cursor-pointer hover:text-[#009739] transition-colors"
@@ -173,19 +190,19 @@ export function ProductCard({ product, showQuickAdd = true }: ProductCardProps) 
 
         {/* Action buttons */}
         {showQuickAdd && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 mt-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mt-auto">
             <button
               onClick={() => navigate(`/product/${product.id}`)}
-              className="flex-1 py-2 px-3 rounded-full border border-gray-200 text-gray-800 text-xs font-medium hover:border-gray-400 transition-colors whitespace-nowrap"
+              className="flex-1 min-w-[120px] py-3 px-4 rounded-2xl border border-gray-200 text-gray-800 text-sm font-semibold hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-colors whitespace-nowrap"
             >
               View Details
             </button>
             <button
               onClick={handleAddToCart}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-[#009739] transition-colors whitespace-nowrap"
+              className="flex-1 min-w-[120px] flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gray-900 text-white text-sm font-semibold hover:bg-[#009739] transition-colors whitespace-nowrap"
               aria-label={`Add ${product.name} to cart`}
             >
-              <ShoppingBasket className="w-3.5 h-3.5" />
+              <ShoppingBasket className="w-4 h-4" />
               Add to Cart
             </button>
           </div>

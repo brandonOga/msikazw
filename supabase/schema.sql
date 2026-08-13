@@ -21,10 +21,13 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "Users can view their own profile" on public.profiles;
 create policy "Users can view their own profile"
   on public.profiles for select using (auth.uid() = id);
+drop policy if exists "Users can update their own profile" on public.profiles;
 create policy "Users can update their own profile"
   on public.profiles for update using (auth.uid() = id);
+drop policy if exists "Profile created on signup" on public.profiles;
 create policy "Profile created on signup"
   on public.profiles for insert with check (auth.uid() = id);
 
@@ -74,12 +77,28 @@ create table if not exists public.sellers (
 
 alter table public.sellers enable row level security;
 
+drop policy if exists "Anyone can view approved sellers" on public.sellers;
 create policy "Anyone can view approved sellers"
   on public.sellers for select using (status = 'approved');
+drop policy if exists "Seller owner can view their own record" on public.sellers;
 create policy "Seller owner can view their own record"
   on public.sellers for select using (auth.uid() = user_id);
+drop policy if exists "Admin can view all seller applications" on public.sellers;
+create policy "Admin can view all seller applications"
+  on public.sellers for select using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+  );
+drop policy if exists "Seller owner can update their own record" on public.sellers;
 create policy "Seller owner can update their own record"
   on public.sellers for update using (auth.uid() = user_id);
+drop policy if exists "Admin can update seller records" on public.sellers;
+create policy "Admin can update seller records"
+  on public.sellers for update using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+  ) with check (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+  );
+drop policy if exists "Authenticated users can create a seller application" on public.sellers;
 create policy "Authenticated users can create a seller application"
   on public.sellers for insert with check (auth.uid() = user_id);
 
@@ -95,10 +114,12 @@ create table if not exists public.seller_documents (
 
 alter table public.seller_documents enable row level security;
 
+drop policy if exists "Seller can view own documents" on public.seller_documents;
 create policy "Seller can view own documents"
   on public.seller_documents for select using (
     exists (select 1 from public.sellers s where s.id = seller_id and s.user_id = auth.uid())
   );
+drop policy if exists "Seller can upload own documents" on public.seller_documents;
 create policy "Seller can upload own documents"
   on public.seller_documents for insert with check (
     exists (select 1 from public.sellers s where s.id = seller_id and s.user_id = auth.uid())
@@ -129,10 +150,12 @@ create table if not exists public.products (
 
 alter table public.products enable row level security;
 
+drop policy if exists "Anyone can view in-stock products from approved sellers" on public.products;
 create policy "Anyone can view in-stock products from approved sellers"
   on public.products for select using (
     exists (select 1 from public.sellers s where s.id = seller_id and s.status = 'approved')
   );
+drop policy if exists "Seller can manage own products" on public.products;
 create policy "Seller can manage own products"
   on public.products for all using (
     exists (select 1 from public.sellers s where s.id = seller_id and s.user_id = auth.uid())
@@ -152,9 +175,12 @@ create table if not exists public.reviews (
 
 alter table public.reviews enable row level security;
 
+drop policy if exists "Anyone can view reviews" on public.reviews;
 create policy "Anyone can view reviews" on public.reviews for select using (true);
+drop policy if exists "Authenticated users can write reviews" on public.reviews;
 create policy "Authenticated users can write reviews"
   on public.reviews for insert with check (auth.uid() = user_id);
+drop policy if exists "User can delete own review" on public.reviews;
 create policy "User can delete own review"
   on public.reviews for delete using (auth.uid() = user_id);
 
@@ -170,6 +196,7 @@ create table if not exists public.cart_items (
 
 alter table public.cart_items enable row level security;
 
+drop policy if exists "User can manage own cart" on public.cart_items;
 create policy "User can manage own cart"
   on public.cart_items for all using (auth.uid() = user_id);
 
@@ -183,8 +210,16 @@ create table if not exists public.wishlist (
 
 alter table public.wishlist enable row level security;
 
+drop policy if exists "User can manage own wishlist" on public.wishlist;
 create policy "User can manage own wishlist"
   on public.wishlist for all using (auth.uid() = user_id);
+
+-- ── Migration: seller review/notification tracking ────────────────────────────
+alter table public.sellers
+  add column if not exists notify_attempts integer DEFAULT 0,
+  add column if not exists notified_at timestamptz NULL,
+  add column if not exists approved_at timestamptz NULL,
+  add column if not exists review_notes text;
 
 -- ── Orders ───────────────────────────────────────────────────────────────────
 create table if not exists public.orders (
@@ -212,10 +247,13 @@ create table if not exists public.orders (
 
 alter table public.orders enable row level security;
 
+drop policy if exists "Buyer can view own orders" on public.orders;
 create policy "Buyer can view own orders"
   on public.orders for select using (auth.uid() = buyer_id);
+drop policy if exists "Buyer can create orders" on public.orders;
 create policy "Buyer can create orders"
   on public.orders for insert with check (auth.uid() = buyer_id);
+drop policy if exists "Buyer can update own orders" on public.orders;
 create policy "Buyer can update own orders"
   on public.orders for update using (auth.uid() = buyer_id);
 
@@ -233,10 +271,12 @@ create table if not exists public.order_items (
 
 alter table public.order_items enable row level security;
 
+drop policy if exists "Buyer can view own order items" on public.order_items;
 create policy "Buyer can view own order items"
   on public.order_items for select using (
     exists (select 1 from public.orders o where o.id = order_id and o.buyer_id = auth.uid())
   );
+drop policy if exists "System can insert order items" on public.order_items;
 create policy "System can insert order items"
   on public.order_items for insert with check (
     exists (select 1 from public.orders o where o.id = order_id and o.buyer_id = auth.uid())
@@ -257,8 +297,10 @@ create table if not exists public.disputes (
 
 alter table public.disputes enable row level security;
 
+drop policy if exists "Buyer can view own disputes" on public.disputes;
 create policy "Buyer can view own disputes"
   on public.disputes for select using (auth.uid() = buyer_id);
+drop policy if exists "Buyer can create disputes" on public.disputes;
 create policy "Buyer can create disputes"
   on public.disputes for insert with check (auth.uid() = buyer_id);
 
@@ -275,10 +317,13 @@ create table if not exists public.notifications (
 
 alter table public.notifications enable row level security;
 
+drop policy if exists "User can view own notifications" on public.notifications;
 create policy "User can view own notifications"
   on public.notifications for select using (auth.uid() = user_id);
+drop policy if exists "User can mark own notifications read" on public.notifications;
 create policy "User can mark own notifications read"
   on public.notifications for update using (auth.uid() = user_id);
+drop policy if exists "System can insert notifications" on public.notifications;
 create policy "System can insert notifications"
   on public.notifications for insert with check (auth.uid() = user_id);
 
@@ -302,6 +347,7 @@ create table if not exists public.quotations (
 
 alter table public.quotations enable row level security;
 
+drop policy if exists "Buyer can manage own quotations" on public.quotations;
 create policy "Buyer can manage own quotations"
   on public.quotations for all using (auth.uid() = buyer_id);
 
@@ -323,6 +369,7 @@ create table if not exists public.pre_orders (
 
 alter table public.pre_orders enable row level security;
 
+drop policy if exists "Buyer can manage own pre-orders" on public.pre_orders;
 create policy "Buyer can manage own pre-orders"
   on public.pre_orders for all using (auth.uid() = buyer_id);
 
@@ -336,6 +383,7 @@ create table if not exists public.back_in_stock (
 
 alter table public.back_in_stock enable row level security;
 
+drop policy if exists "User can manage own back-in-stock subscriptions" on public.back_in_stock;
 create policy "User can manage own back-in-stock subscriptions"
   on public.back_in_stock for all using (auth.uid() = user_id);
 
@@ -345,21 +393,17 @@ returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end;
 $$;
 
-create trigger set_profiles_updated_at   before update on public.profiles   for each row execute procedure public.set_updated_at();
-create trigger set_sellers_updated_at    before update on public.sellers    for each row execute procedure public.set_updated_at();
-create trigger set_products_updated_at   before update on public.products   for each row execute procedure public.set_updated_at();
-create trigger set_orders_updated_at     before update on public.orders     for each row execute procedure public.set_updated_at();
-create trigger set_disputes_updated_at   before update on public.disputes   for each row execute procedure public.set_updated_at();
+create or replace trigger set_profiles_updated_at   before update on public.profiles   for each row execute procedure public.set_updated_at();
+create or replace trigger set_sellers_updated_at    before update on public.sellers    for each row execute procedure public.set_updated_at();
+create or replace trigger set_products_updated_at   before update on public.products   for each row execute procedure public.set_updated_at();
+create or replace trigger set_orders_updated_at     before update on public.orders     for each row execute procedure public.set_updated_at();
+create or replace trigger set_disputes_updated_at   before update on public.disputes   for each row execute procedure public.set_updated_at();
 
 -- ── Migration: shipment tracking columns ──────────────────────────────────────
 -- Run after initial schema setup if upgrading an existing database
 alter table public.orders
   add column if not exists shipment_id     text,
   add column if not exists shipment_status text;
-
--- ── Migration: seller review notes ───────────────────────────────────────────
-alter table public.sellers
-  add column if not exists review_notes text;
 
 -- ── Migration: dispute resolution column ─────────────────────────────────────
 alter table public.disputes
@@ -371,6 +415,7 @@ alter table public.sellers
 
 -- ── Seller order access policies ─────────────────────────────────────────────
 -- Allow sellers to view order_items for their own products
+drop policy if exists "Seller can view order items for their products" on public.order_items;
 create policy "Seller can view order items for their products"
   on public.order_items for select using (
     exists (
@@ -381,6 +426,7 @@ create policy "Seller can view order items for their products"
   );
 
 -- Allow sellers to view orders that contain their products
+drop policy if exists "Seller can view orders containing their products" on public.orders;
 create policy "Seller can view orders containing their products"
   on public.orders for select using (
     buyer_id = auth.uid()
@@ -388,7 +434,7 @@ create policy "Seller can view orders containing their products"
       select 1 from public.order_items oi
       join public.products p on p.id = oi.product_id
       join public.sellers s on s.id = p.seller_id
-      where oi.order_id = id and s.user_id = auth.uid()
+      where oi.order_id = orders.id and s.user_id = auth.uid()
     )
   );
 
@@ -442,6 +488,7 @@ create or replace trigger on_quotation_created
 
 -- Sellers could not view quotation requests for their own products at all
 -- (the only quotations policy was "buyer can manage own quotations").
+drop policy if exists "Seller can view quotations for their products" on public.quotations;
 create policy "Seller can view quotations for their products"
   on public.quotations for select using (
     exists (
@@ -452,6 +499,7 @@ create policy "Seller can view quotations for their products"
   );
 
 -- Sellers can update status (e.g. mark 'replied') on quotations for their products
+drop policy if exists "Seller can update quotations for their products" on public.quotations;
 create policy "Seller can update quotations for their products"
   on public.quotations for update using (
     exists (
@@ -531,3 +579,52 @@ $$;
 create or replace trigger on_seller_application_created
   after insert on public.sellers
   for each row execute procedure public.handle_new_seller_application();
+
+-- ── Migration: buyer preferred payment number ─────────────────────────────────
+alter table public.profiles
+  add column if not exists preferred_payment text;
+
+-- ── Migration: seller bank payout details (optional) ──────────────────────────
+alter table public.sellers
+  add column if not exists bank_name text,
+  add column if not exists bank_account text;
+
+-- ── Migration: notify seller when their application is approved/rejected ─────
+-- Admins reviewing an application never notified the seller in-app — nothing
+-- wrote to public.notifications for the seller's user_id. Add a trigger that
+-- does it server-side (security definer), since RLS forbids the admin's
+-- client from inserting a notification row owned by another user (the
+-- seller). Fires on any UPDATE that changes status, regardless of whether
+-- the admin dashboard or a serverless endpoint performed it.
+
+create or replace function public.handle_seller_status_change()
+returns trigger language plpgsql security definer as $$
+begin
+  if new.status = old.status then
+    return new;
+  end if;
+
+  if new.status = 'approved' then
+    insert into public.notifications (user_id, type, title, body)
+    values (
+      new.user_id, 'system', 'Store Approved',
+      'Congratulations! "' || new.business_name || '" has been approved and is now live on Msika.'
+    );
+  elsif new.status = 'rejected' then
+    insert into public.notifications (user_id, type, title, body)
+    values (
+      new.user_id, 'system', 'Application Not Approved',
+      'Your application for "' || new.business_name || '" was not approved.'
+        || case when new.review_notes is not null and new.review_notes <> ''
+             then ' Reason: ' || new.review_notes
+             else '' end
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace trigger on_seller_status_changed
+  after update on public.sellers
+  for each row execute procedure public.handle_seller_status_change();

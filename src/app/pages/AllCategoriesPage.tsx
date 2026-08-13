@@ -289,7 +289,7 @@ function ProductSection({
             View all <ArrowRight className="w-4 h-4" />
           </button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {items.map(product => <ProductCard key={product.id} product={product} />)}
         </div>
       </div>
@@ -399,12 +399,12 @@ export function AllCategoriesPage() {
   const searchActive = search.trim().length > 0;
 
   // ── Derived product shelves ─────────────────────────────────────────────────
-  const shelfTopRated    = useMemo(() => [...products].sort((a, b) => b.rating - a.rating).slice(0, 4), []);
-  const shelfBestSellers = useMemo(() => [...products].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 4), []);
-  const shelfNewArrivals = useMemo(() => products.filter(p => p.isNew).slice(0, 4), []);
-  const shelfOnSale      = useMemo(() => products.filter(p => p.isDeal).slice(0, 4), []);
-  const shelfTrending    = useMemo(() => [...products].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(4, 8), []);
-  const shelfBudget      = useMemo(() => products.filter(p => p.price < 20).slice(0, 4), []);
+  const shelfTopRated    = useMemo(() => [...products].sort((a, b) => b.rating - a.rating).slice(0, 3), []);
+  const shelfBestSellers = useMemo(() => [...products].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 3), []);
+  const shelfNewArrivals = useMemo(() => products.filter(p => p.isNew).slice(0, 3), []);
+  const shelfOnSale      = useMemo(() => products.filter(p => p.isDeal).slice(0, 3), []);
+  const shelfTrending    = useMemo(() => [...products].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(3, 6), []);
+  const shelfBudget      = useMemo(() => products.filter(p => p.price < 20).slice(0, 3), []);
 
   const searchResults = searchActive
     ? categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))

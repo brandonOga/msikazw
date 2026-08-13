@@ -95,6 +95,8 @@ export interface SellerApplication {
   email?: string;
   logoUrl?: string;
   bannerUrl?: string;
+  bankName?: string;
+  bankAccount?: string;
 }
 
 export interface User {
@@ -105,6 +107,7 @@ export interface User {
   role: UserRole;
   location?: string;
   avatar?: string;
+  preferredPayment?: string;
 }
 
 export interface CartItem {
@@ -243,7 +246,7 @@ interface StoreContextType {
 
   onboardingStatus: OnboardingStatus;
   sellerApplication: SellerApplication | null;
-  submitSellerApplication: (app: Omit<SellerApplication, 'referenceNumber' | 'submittedAt'>) => void;
+  submitSellerApplication: (app: Omit<SellerApplication, 'referenceNumber' | 'submittedAt'>) => Promise<{ success: boolean; error: string | null }>;
   approveSellerAccount: () => void;
 
   addReview: (productId: string, review: { user: string; rating: number; comment: string }) => void;
@@ -494,6 +497,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             email: session.user.email,
             role: profile.role,
             location: profile.location || undefined,
+            preferredPayment: profile.preferred_payment || undefined,
           };
           setUser(u);
           save('user', u);
@@ -515,6 +519,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         save('user', null);
         setSellerDbId(null);
         save('sellerDbId', null);
+        setNotifications([]);
+        setOnboardingStatus('none');
+        setSellerApplication(null);
       } else if (session?.user && event === 'SIGNED_IN') {
         const profile = await authDb.getProfile(session.user.id);
         if (profile) {
@@ -525,6 +532,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             email: session.user.email,
             role: profile.role,
             location: profile.location || undefined,
+            preferredPayment: profile.preferred_payment || undefined,
           };
           setUser(u);
           save('user', u);
@@ -571,6 +579,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           email: data.user.email,
           role: profile.role,
           location: profile.location || undefined,
+          preferredPayment: profile.preferred_payment || undefined,
         };
         setUser(u);
         save('user', u);
@@ -597,14 +606,41 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const verifyEmailOtp = async (email: string, token: string): Promise<{ error: string | null }> => {
-    return authDb.verifyEmailOtp(email, token);
-    // onAuthStateChange listener will handle setting user state after success
+    const result = await authDb.verifyEmailOtp(email, token);
+    if (result.error) return result;
+
+    // Don't rely on the onAuthStateChange listener alone to populate `user` —
+    // it fires asynchronously and callers (e.g. Onboarding submitting the
+    // seller application right after OTP verification) need `user` set
+    // before they proceed, or they silently skip the Supabase write.
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      const profile = await authDb.getProfile(authUser.id);
+      if (profile) {
+        const u: User = {
+          id: profile.id,
+          name: profile.name,
+          phone: profile.phone || '',
+          email: authUser.email,
+          role: profile.role,
+          location: profile.location || undefined,
+          preferredPayment: profile.preferred_payment || undefined,
+        };
+        setUser(u);
+        save('user', u);
+      }
+    }
+
+    return result;
   };
 
   const logout = () => {
     setUser(null);
     save('user', null);
     setIsCartOpen(false);
+    setNotifications([]);
+    setOnboardingStatus('none');
+    setSellerApplication(null);
     if (isSupabaseConfigured) authDb.signOut();
   };
 
@@ -615,11 +651,16 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       save('user', updated);
       return updated;
     });
-    if (user?.id && isSupabaseConfigured) {
-      await authDb.updateProfile(user.id, {
+    // Read the auth session directly rather than the `user` state closure —
+    // callers right after signup/OTP verification can run before React has
+    // re-rendered with the freshly-set `user`, silently skipping this write.
+    const authUserId = isSupabaseConfigured ? (await supabase.auth.getUser()).data.user?.id : undefined;
+    if (authUserId && isSupabaseConfigured) {
+      await authDb.updateProfile(authUserId, {
         name: data.name,
         phone: data.phone,
         location: data.location,
+        preferredPayment: data.preferredPayment,
       });
     }
   };
@@ -803,16 +844,26 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const submitSellerApplication = async (app: Omit<SellerApplication, 'referenceNumber' | 'submittedAt'>) => {
     let referenceNumber = `MSK-S${Date.now().toString().slice(-6)}`;
 
-    // Persist to Supabase if user is logged in
-    if (user?.id && isSupabaseConfigured) {
-      const result = await sellersDb.submitSellerApplication(user.id, app);
-      if (result) referenceNumber = result.referenceNumber;
-      // Immediately fetch and store the seller's DB UUID so product creation works right away
-      const seller = await sellersDb.fetchSellerByUserId(user.id);
-      if (seller) {
-        setSellerDbId(seller.id as string);
-        save('sellerDbId', seller.id as string);
+    // Read the auth session directly instead of the `user` state closure —
+    // this can run immediately after signup/OTP verification, before React
+    // has re-rendered with the freshly-set `user`, so the closed-over value
+    // here would still be null and silently skip the database write.
+    const authUserId = isSupabaseConfigured ? (await supabase.auth.getUser()).data.user?.id : undefined;
+
+    if (authUserId && isSupabaseConfigured) {
+      const result = await sellersDb.submitSellerApplication(authUserId, app);
+      if (!result) {
+        return { success: false, error: 'Unable to submit seller application. Please try again.' };
       }
+      referenceNumber = result.referenceNumber;
+
+      const seller = await sellersDb.fetchSellerByUserId(authUserId);
+      if (!seller) {
+        return { success: false, error: 'Seller record could not be loaded after application. Please reload and try again.' };
+      }
+
+      setSellerDbId(seller.id as string);
+      save('sellerDbId', seller.id as string);
     }
 
     const application: SellerApplication = {
@@ -833,7 +884,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         fetch('/api/send-seller-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: user?.email || application.email || '', name: user?.name || application.businessName || 'Seller', referenceNumber }),
+          body: JSON.stringify({ to: user?.email || application.email || '', name: user?.name || application.businessName || 'Seller', referenceNumber, type: 'application_received' }),
         }).then(async res => {
           if (!res.ok) {
             const body = await res.text();
@@ -841,7 +892,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           }
         }).catch(err => console.warn('Send seller email error', err));
 
-        // Notify admins (email) that a new application needs review — non-blocking
+        // Notify admins (email) that a new application needs review — non-blocking but log on failure.
         fetch('/api/notify-admins-new-seller', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -850,12 +901,19 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           if (!res.ok) {
             const body = await res.text();
             console.warn('Failed to notify admins:', res.status, body);
+          } else {
+            const payload = await res.json().catch(() => null);
+            if (payload?.error) {
+              console.warn('Admin notification endpoint returned error:', payload.error);
+            }
           }
         }).catch(err => console.warn('Notify admins error', err));
       }
     } catch (err) {
       console.warn('Error triggering seller email', err);
     }
+
+    return { success: true, error: null };
   };
 
   const approveSellerAccount = async () => {

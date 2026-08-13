@@ -1,11 +1,16 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import {
   CheckCircle, Search, MapPin, ArrowRight, Package,
-  Sparkles, X, Trophy, Zap, ChevronLeft, ChevronRight, ChevronDown, Clock,
+  Sparkles, X, Trophy, Zap, ChevronLeft, Clock, SlidersHorizontal,
 } from 'lucide-react';
 import { StarRating } from '../components/StarRating';
+import { SellerLogo } from '../components/SellerLogo';
+import { SellerBanner } from '../components/SellerBanner';
+import { FilterDropdown } from '../components/FilterDropdown';
+import { MobileFilterDrawer } from '../components/MobileFilterDrawer';
 import { useSellers } from '../../lib/hooks/useProducts';
+import { categories } from '../data/mockData';
 
 const SHOPS_BANNER = 'https://images.unsplash.com/photo-1751965681712-697c555b8188?w=1600&q=80&fit=crop';
 
@@ -22,8 +27,8 @@ function SpotlightCard({
   seller, badge, accentColor,
 }: {
   seller: { id: string; name: string; banner: string; logo: string; verified: boolean; location: string; rating: number; reviewCount: number; productCount: number; category: string; joined?: string };
-  badge: string;
-  accentColor: string;
+  badge?: string;
+  accentColor?: string;
 }) {
   const navigate = useNavigate();
   const productCount = seller.productCount;
@@ -31,18 +36,16 @@ function SpotlightCard({
   return (
     <button
       onClick={() => navigate(`/store/${seller.id}`)}
-      className="group bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden text-left hover:shadow-[0_8px_32px_rgba(0,0,0,0.10)] hover:-translate-y-1 transition-all duration-300 cursor-pointer w-full"
+      className="group bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden text-left hover:shadow-[0_8px_32px_rgba(0,0,0,0.10)] hover:-translate-y-1 transition-all duration-300 cursor-pointer w-full flex flex-col"
       style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
       aria-label={`Visit ${seller.name}`}
     >
       {/* Banner */}
-      <div className="relative overflow-hidden bg-gray-100" style={{ height: '140px' }}>
-        <img
+      <div className="relative overflow-hidden bg-gray-100 shrink-0" style={{ height: '140px' }}>
+        <SellerBanner
+          name={seller.name}
           src={seller.banner}
-          alt=""
-          aria-hidden="true"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
         />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent 60%)' }} />
 
@@ -66,32 +69,33 @@ function SpotlightCard({
         )}
 
         {/* Section badge */}
-        <span
-          className="absolute top-3 left-3 text-[10px] px-2.5 py-1 rounded-full"
-          style={{
-            fontWeight: 700,
-            background: accentColor,
-            color: accentColor === '#FFD100' ? '#7a5c00' : '#fff',
-          }}
-        >
-          {badge}
-        </span>
+        {badge && (
+          <span
+            className="absolute top-3 left-3 text-[10px] px-2.5 py-1 rounded-full"
+            style={{
+              fontWeight: 700,
+              background: accentColor,
+              color: accentColor === '#FFD100' ? '#7a5c00' : '#fff',
+            }}
+          >
+            {badge}
+          </span>
+        )}
       </div>
 
       {/* Body */}
-      <div className="p-5">
+      <div className="p-5 flex-1 flex flex-col">
         <div className="-mt-10 relative mb-3">
-          <img
+          <SellerLogo
+            name={seller.name}
             src={seller.logo}
-            alt={seller.name}
             className="w-14 h-14 rounded-2xl object-cover shadow-lg"
-            style={{ border: '3px solid #fff' }}
-            loading="lazy"
+            style={{ border: '3px solid #fff', fontSize: '1rem' }}
           />
         </div>
         <p className="text-gray-900 mb-0.5 truncate" style={{ fontSize: '1rem', fontWeight: 700 }}>{seller.name}</p>
-        <p className="text-gray-500 mb-3" style={{ fontSize: '0.78rem' }}>{seller.category}</p>
-        <div className="flex items-center gap-3 flex-wrap">
+        {seller.category && <p className="text-gray-500 mb-3" style={{ fontSize: '0.78rem' }}>{seller.category}</p>}
+        <div className="flex items-center gap-3 flex-wrap mb-4">
           <span className="flex items-center gap-1 text-gray-500" style={{ fontSize: '0.72rem' }}>
             <MapPin className="w-3 h-3 shrink-0" /> {seller.location}
           </span>
@@ -99,7 +103,7 @@ function SpotlightCard({
             <Package className="w-3 h-3 shrink-0" /> {productCount} items
           </span>
         </div>
-        <div className="mt-4 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid #f3f4f6' }}>
+        <div className="mt-auto pt-3 flex items-center justify-between" style={{ borderTop: '1px solid #f3f4f6' }}>
           <span className="text-gray-400" style={{ fontSize: '0.72rem' }}>Since {seller.joined}</span>
           <span className="flex items-center gap-1 text-[#009739] group-hover:gap-2 transition-all" style={{ fontSize: '0.78rem', fontWeight: 700 }}>
             Visit shop <ArrowRight className="w-3.5 h-3.5" />
@@ -112,14 +116,13 @@ function SpotlightCard({
 
 // ── Section header ────────────────────────────────────────────────────────────
 function SectionHeader({
-  icon, iconBg, overline, overlineColor, title, onViewAll,
+  icon, iconBg, overline, overlineColor, title,
 }: {
   icon: React.ReactNode;
   iconBg: string;
   overline: string;
   overlineColor: string;
   title: string;
-  onViewAll?: () => void;
 }) {
   return (
     <div className="flex items-end justify-between mb-8">
@@ -134,15 +137,6 @@ function SectionHeader({
           <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{title}</h2>
         </div>
       </div>
-      {onViewAll && (
-        <button
-          onClick={onViewAll}
-          className="flex items-center gap-1 text-[#009739] transition-colors"
-          style={{ fontSize: '0.82rem', fontWeight: 600 }}
-        >
-          See all shops <ArrowRight className="w-4 h-4" />
-        </button>
-      )}
     </div>
   );
 }
@@ -154,20 +148,18 @@ export function ShopsPage() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [sortBy, setSortBy] = useState('default');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const { sellers } = useSellers();
 
-  const ALL_CATEGORIES = ['All', ...Array.from(new Set(sellers.map(s => s.category)))];
+  const ALL_CATEGORIES = ['All', ...categories.map(c => c.name)];
   const sortedByDate     = [...sellers].sort((a, b) => new Date(b.joined).getTime() - new Date(a.joined).getTime());
   const newestSellers    = sortedByDate.slice(0, 3);
   const risingStars      = sortedByDate.slice(3, 6);
   const topRatedSellers  = [...sellers].sort((a, b) => b.rating - a.rating).slice(0, 5);
 
-  const pillsRef = useRef<HTMLDivElement>(null);
-  const scrollPills = (dir: 'left' | 'right') => {
-    pillsRef.current?.scrollBy({ left: dir === 'left' ? -240 : 240, behavior: 'smooth' });
-  };
-
   const hasActiveFilters = activeCategory !== 'All' || search.trim() !== '' || sortBy !== 'default';
+  const activeFilterCount = [activeCategory !== 'All', search.trim() !== '', sortBy !== 'default'].filter(Boolean).length;
+  const clearFilters = () => { setSearch(''); setActiveCategory('All'); setSortBy('default'); };
 
   const filteredSellers = useMemo(() => {
     let list = [...sellers];
@@ -246,192 +238,278 @@ export function ShopsPage() {
               </p>
             </div>
 
-            {/* Search */}
-            <div className="relative w-full md:w-64 shrink-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.35)' }} />
-              <input
-                type="text"
-                placeholder="Search by name, category, or location…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 rounded-xl text-sm focus:outline-none transition-colors"
-                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white' }}
-                onFocus={e => { e.currentTarget.style.border = '1px solid #009739'; }}
-                onBlur={e => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'; }}
-              />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0">
-                  <X className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.4)' }} />
-                </button>
+            {/* Mobile filters trigger */}
+            <button
+              onClick={() => setShowMobileFilters(true)}
+              className="md:hidden flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl cursor-pointer shrink-0 border-none"
+              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white' }}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-[#009739] text-white flex items-center justify-center" style={{ fontSize: '0.7rem', fontWeight: 700 }}>
+                  {activeFilterCount}
+                </span>
               )}
-            </div>
+            </button>
           </div>
         </div>
       </section>
 
-      {/* ── FILTER BAR ── */}
-      <section className="sticky top-16 z-20 shadow-sm" style={{ background: '#0a0a0a', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="max-w-7xl mx-auto px-4 lg:px-10">
-          <div className="flex items-center gap-2 py-3">
+      {/* ── MAIN LAYOUT: sidebar filters + content ── */}
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-10">
+        <div className="flex gap-6 items-start">
 
-            {/* ← Left scroll arrow */}
-            <button
-              onClick={() => scrollPills('left')}
-              aria-label="Scroll categories left"
-              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)' }}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+          {/* ─── Left Sidebar ─── */}
+          <aside className="hidden md:flex flex-col gap-3 w-56 shrink-0 sticky top-20">
 
-            {/* Scrollable category pills */}
-            <div ref={pillsRef} className="flex items-center gap-2 flex-1 overflow-x-auto scrollbar-hide">
-              {ALL_CATEGORIES.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className="shrink-0 px-4 py-1.5 rounded-full cursor-pointer transition-all"
-                  style={{
-                    fontSize: '0.78rem',
-                    fontWeight: activeCategory === cat ? 700 : 500,
-                    background: activeCategory === cat ? '#009739' : 'rgba(255,255,255,0.06)',
-                    color:      activeCategory === cat ? '#fff'    : 'rgba(255,255,255,0.55)',
-                    border:     activeCategory === cat ? '1.5px solid #009739' : '1.5px solid rgba(255,255,255,0.1)',
-                    whiteSpace: 'nowrap',
-                  }}
-                  aria-pressed={activeCategory === cat}
-                >
-                  {cat}
-                </button>
-              ))}
+            {/* Search */}
+            <div className="bg-white rounded-xl border border-gray-200 p-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search shops…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-8 pr-7 py-2 rounded-lg text-sm border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#009739] transition-colors"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0 bg-transparent border-none cursor-pointer">
+                    <X className="w-3.5 h-3.5 text-gray-400" />
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* → Right scroll arrow */}
-            <button
-              onClick={() => scrollPills('right')}
-              aria-label="Scroll categories right"
-              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)' }}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            {/* Permanent divider */}
-            <div className="w-px h-5 shrink-0 mx-1" style={{ background: 'rgba(255,255,255,0.12)' }} />
-
-            {/* Sort dropdown */}
-            <div className="relative shrink-0 hidden md:block">
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 rounded-full cursor-pointer focus:outline-none transition-all"
-                style={{
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  background: sortBy !== 'default' ? '#009739' : 'rgba(255,255,255,0.06)',
-                  color:      sortBy !== 'default' ? '#fff'    : 'rgba(255,255,255,0.55)',
-                  border:     sortBy !== 'default' ? '1.5px solid #009739' : '1.5px solid rgba(255,255,255,0.1)',
-                }}
-              >
-                {SHOP_SORT_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ background: '#111', color: '#fff' }}>{o.label}</option>)}
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: sortBy !== 'default' ? '#fff' : 'rgba(255,255,255,0.4)' }} />
+            {/* Categories */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h3 className="text-gray-900" style={{ fontSize: '0.82rem', fontWeight: 700 }}>Categories</h3>
+              </div>
+              <ul className="max-h-72 overflow-y-auto">
+                {ALL_CATEGORIES.map(cat => {
+                  const isActive = activeCategory === cat;
+                  return (
+                    <li key={cat}>
+                      <label
+                        className="w-full px-3 py-2 flex items-center gap-2.5 cursor-pointer transition-colors"
+                        style={{ background: isActive ? '#f0faf4' : 'transparent' }}
+                      >
+                        <input
+                          type="radio"
+                          name="shops-category"
+                          checked={isActive}
+                          onChange={() => setActiveCategory(cat)}
+                          className="accent-[#009739]"
+                        />
+                        <span
+                          className="flex-1 truncate"
+                          style={{ fontSize: '0.8rem', fontWeight: isActive ? 700 : 400, color: isActive ? '#009739' : '#374151' }}
+                        >
+                          {cat}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
 
+            {/* Clear filters */}
             {hasActiveFilters && (
               <button
-                onClick={() => { setSearch(''); setActiveCategory('All'); setSortBy('default'); }}
-                className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full cursor-pointer transition-all"
-                style={{ fontSize: '0.75rem', fontWeight: 600, color: '#CE1126', background: 'rgba(206,17,38,0.1)', border: '1.5px solid rgba(206,17,38,0.2)' }}
+                onClick={clearFilters}
+                className="w-full py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5"
+                style={{ fontSize: '0.8rem', fontWeight: 600 }}
               >
-                <X className="w-3 h-3" /> Clear
+                <X className="w-3.5 h-3.5" /> Clear All Filters
               </button>
             )}
+          </aside>
 
-            {/* Result count */}
-            <div className="ml-auto shrink-0">
-              <span className="text-white" style={{ fontSize: '0.82rem', fontWeight: 700 }}>{filteredSellers.length}</span>
-              <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', marginLeft: '4px' }}>shops</span>
+          {/* ─── Main content ─── */}
+          <div className="flex-1 min-w-0">
+
+            {/* Active filter chips + sort + result count */}
+            <div className="flex items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-200 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                {activeCategory !== 'All' && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-[#f0faf4] text-[#009739] rounded-full border border-[#009739]/20" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                    {activeCategory}
+                    <button onClick={() => setActiveCategory('All')} className="p-0 bg-transparent border-none cursor-pointer leading-none"><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {search.trim() && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-[#f0faf4] text-[#009739] rounded-full border border-[#009739]/20" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                    "{search.trim()}"
+                    <button onClick={() => setSearch('')} className="p-0 bg-transparent border-none cursor-pointer leading-none"><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                <span className="text-gray-500" style={{ fontSize: '0.82rem' }}>
+                  <span className="text-gray-900" style={{ fontWeight: 700 }}>{filteredSellers.length}</span> shops
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-gray-500 hidden sm:block" style={{ fontSize: '0.8rem' }}>Sort:</span>
+                <FilterDropdown label="Sort by" value={sortBy} onChange={setSortBy} options={SHOP_SORT_OPTIONS} />
+              </div>
             </div>
+
+            {hasActiveFilters ? (
+              filteredSellers.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-2xl p-16 text-center">
+                  <div className="w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-gray-100">
+                    <Search className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <h3 className="text-gray-900 mb-2" style={{ fontSize: '1.1rem', fontWeight: 700 }}>No shops found</h3>
+                  <p className="text-gray-500 mb-5" style={{ fontSize: '0.875rem' }}>Try a different category or search term</p>
+                  <button onClick={clearFilters} className="px-6 py-2.5 bg-[#009739] text-white rounded-xl hover:bg-[#007f30] transition-colors cursor-pointer border-none" style={{ fontSize: '0.875rem', fontWeight: 600 }}>
+                    Clear all filters
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  {filteredSellers.map(seller => (
+                    <SpotlightCard key={seller.id} seller={seller} />
+                  ))}
+                </div>
+              )
+            ) : (
+              /* ── SECTIONED BROWSE VIEW (no filters) ── */
+              <div className="divide-y divide-gray-100">
+
+                {/* Fresh Arrivals / New to Msika */}
+                <section className="pb-14">
+                  <SectionHeader
+                    icon={<Sparkles className="w-4 h-4 text-[#009739]" />}
+                    iconBg="rgba(0,151,57,0.08)"
+                    overline="Fresh Arrivals"
+                    overlineColor="#009739"
+                    title="New to Msika"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {newestSellers.map(seller => (
+                      <SpotlightCard
+                        key={seller.id}
+                        seller={seller}
+                        badge="Just joined"
+                        accentColor="#009739"
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                {/* Rising Stars / Sellers to Watch */}
+                <section className="py-14">
+                  <SectionHeader
+                    icon={<Zap className="w-4 h-4" style={{ color: '#b8930a' }} />}
+                    iconBg="rgba(255,209,0,0.12)"
+                    overline="Rising Stars"
+                    overlineColor="#b8930a"
+                    title="Sellers to Watch"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {risingStars.map(seller => (
+                      <SpotlightCard
+                        key={seller.id}
+                        seller={seller}
+                        badge="On the rise"
+                        accentColor="#FFD100"
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                {/* Community Favourites — Top Rated */}
+                <section className="pt-14">
+                  <SectionHeader
+                    icon={<Trophy className="w-4 h-4" style={{ color: '#b8930a' }} />}
+                    iconBg="rgba(255,209,0,0.12)"
+                    overline="Community Favourites"
+                    overlineColor="#b8930a"
+                    title="Top Rated Sellers"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {topRatedSellers.slice(0, 3).map((seller, idx) => {
+                      const rankAccents = ['#FFD100', '#9ca3af', '#cd7f32'];
+                      const rankLabels  = ['#1 Rated', '#2 Rated', '#3 Rated'];
+                      return (
+                        <SpotlightCard
+                          key={seller.id}
+                          seller={seller}
+                          badge={rankLabels[idx]}
+                          accentColor={rankAccents[idx]}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              </div>
+            )}
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* ── SECTION 1: Fresh Arrivals / New to Msika ── */}
-      <section className="border-t border-[#EAEAEA] py-14">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <SectionHeader
-            icon={<Sparkles className="w-4 h-4 text-[#009739]" />}
-            iconBg="rgba(0,151,57,0.08)"
-            overline="Fresh Arrivals"
-            overlineColor="#009739"
-            title="New to Msika"
-            onViewAll={() => navigate('/shops')}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {newestSellers.map(seller => (
-              <SpotlightCard
-                key={seller.id}
-                seller={seller}
-                badge="Just joined"
-                accentColor="#009739"
-              />
-            ))}
+      {/* ── Mobile filter drawer ── */}
+      <MobileFilterDrawer isOpen={showMobileFilters} onClose={() => setShowMobileFilters(false)}>
+        <div>
+          <p className="text-gray-500 mb-3" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Search</p>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search shops…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#009739]"
+            />
           </div>
         </div>
-      </section>
-
-      {/* ── SECTION 2: Rising Stars / Sellers to Watch ── */}
-      <section className="border-t border-[#EAEAEA] py-14" style={{ background: '#fafafa' }}>
-        <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <SectionHeader
-            icon={<Zap className="w-4 h-4" style={{ color: '#b8930a' }} />}
-            iconBg="rgba(255,209,0,0.12)"
-            overline="Rising Stars"
-            overlineColor="#b8930a"
-            title="Sellers to Watch"
-            onViewAll={() => navigate('/shops')}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {risingStars.map(seller => (
-              <SpotlightCard
-                key={seller.id}
-                seller={seller}
-                badge="On the rise"
-                accentColor="#FFD100"
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── COMMUNITY FAVOURITES — Top Rated ── */}
-      <section className="border-t border-[#EAEAEA] py-14">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <SectionHeader
-            icon={<Trophy className="w-4 h-4" style={{ color: '#b8930a' }} />}
-            iconBg="rgba(255,209,0,0.12)"
-            overline="Community Favourites"
-            overlineColor="#b8930a"
-            title="Top Rated Sellers"
-            onViewAll={() => navigate('/shops')}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {topRatedSellers.slice(0, 3).map((seller, idx) => {
-              const rankAccents = ['#FFD100', '#9ca3af', '#cd7f32'];
-              const rankLabels  = ['#1 Rated', '#2 Rated', '#3 Rated'];
+        <div>
+          <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Category</p>
+          <ul className="max-h-56 overflow-y-auto rounded-xl border border-gray-200">
+            {ALL_CATEGORIES.map(cat => {
+              const isActive = activeCategory === cat;
               return (
-                <SpotlightCard
-                  key={seller.id}
-                  seller={seller}
-                  badge={rankLabels[idx]}
-                  accentColor={rankAccents[idx]}
-                />
+                <li key={cat}>
+                  <label
+                    className="w-full px-3 py-2.5 flex items-center gap-2.5 cursor-pointer transition-colors"
+                    style={{ background: isActive ? '#f0faf4' : 'transparent' }}
+                  >
+                    <input
+                      type="radio"
+                      name="shops-category-mobile"
+                      checked={isActive}
+                      onChange={() => setActiveCategory(cat)}
+                      className="accent-[#009739]"
+                    />
+                    <span style={{ fontSize: '0.85rem', fontWeight: isActive ? 700 : 400, color: isActive ? '#009739' : '#374151' }}>
+                      {cat}
+                    </span>
+                  </label>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </div>
-      </section>
+        <div>
+          <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Sort By</p>
+          <FilterDropdown label="Sort by" value={sortBy} onChange={setSortBy} options={SHOP_SORT_OPTIONS} minWidth="100%" />
+        </div>
+        {hasActiveFilters && (
+          <button onClick={clearFilters} className="w-full py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+            <X className="w-3.5 h-3.5 inline mr-1" /> Clear All Filters
+          </button>
+        )}
+        <button
+          onClick={() => setShowMobileFilters(false)}
+          className="w-full py-3 bg-[#009739] text-white rounded-xl transition-colors border-none"
+          style={{ fontWeight: 700, fontSize: '0.88rem' }}
+        >
+          Show {filteredSellers.length} Results
+        </button>
+      </MobileFilterDrawer>
 
       {/* ── OPEN A SHOP ── */}
       <section className="border-t border-[#EAEAEA] py-14 bg-white" aria-label="Seller program">

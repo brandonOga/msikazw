@@ -260,7 +260,7 @@ function CategorySection({
           </button>
         )}
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {items.map((product: Product) => (
           <ProductCard key={product.id} product={product} />
         ))}
@@ -356,12 +356,12 @@ export function Categories() {
     const categoryProducts = products.filter(p => p.category === activeCategory);
     if (categoryProducts.length === 0) return null;
     return {
-      topRated:    [...categoryProducts].sort((a, b) => b.rating - a.rating).slice(0, 4),
-      bestSellers: [...categoryProducts].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 4),
-      newArrivals: categoryProducts.filter(p => p.isNew).slice(0, 4),
-      onSale:      categoryProducts.filter(p => p.isDeal).slice(0, 4),
-      trendingNow: [...categoryProducts].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(0, 4),
-      budgetPicks: [...categoryProducts].filter(p => p.price < 20).slice(0, 4),
+      topRated:    [...categoryProducts].sort((a, b) => b.rating - a.rating).slice(0, 3),
+      bestSellers: [...categoryProducts].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 3),
+      newArrivals: categoryProducts.filter(p => p.isNew).slice(0, 3),
+      onSale:      categoryProducts.filter(p => p.isDeal).slice(0, 3),
+      trendingNow: [...categoryProducts].sort((a, b) => (b.reviewCount * b.rating) - (a.reviewCount * a.rating)).slice(0, 3),
+      budgetPicks: [...categoryProducts].filter(p => p.price < 20).slice(0, 3),
     };
   }, [products, activeCategory]);
 
@@ -375,7 +375,7 @@ export function Categories() {
         const sorted = [...catProducts].sort(
           (a, b) => b.reviewCount * b.rating - a.reviewCount * a.rating
         );
-        return { category: cat, items: sorted.slice(0, 4), total: catProducts.length };
+        return { category: cat, items: sorted.slice(0, 3), total: catProducts.length };
       })
       .filter(Boolean) as { category: typeof categories[0]; items: typeof products; total: number }[];
   }, [products, activeCategory]);
@@ -390,7 +390,7 @@ export function Categories() {
     return products
       .filter(p => p.rating >= 4.5 && (activeCategory === 'All' || p.category !== activeCategory))
       .sort((a, b) => b.reviewCount - a.reviewCount)
-      .slice(0, 4);
+      .slice(0, 3);
   }, [products, activeCategory]);
 
   // Recently viewed
@@ -603,7 +603,7 @@ export function Categories() {
                           View all <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {row.items.map(product => <ProductCard key={product.id} product={product} />)}
                       </div>
                     </section>
@@ -645,7 +645,7 @@ export function Categories() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {visibleProducts.slice(0, ITEMS_PER_PAGE).map(product => (
                         <ProductCard key={product.id} product={product} />
                       ))}
@@ -662,14 +662,14 @@ export function Categories() {
                             View all <ChevronRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {popularInZim.map(p => <ProductCard key={`pop-${p.id}`} product={p} />)}
                         </div>
                       </div>
                     )}
 
                     {visibleProducts.length > ITEMS_PER_PAGE && (
-                      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                         {visibleProducts.slice(ITEMS_PER_PAGE).map(product => (
                           <ProductCard key={product.id} product={product} />
                         ))}

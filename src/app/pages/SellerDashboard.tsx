@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useStore } from '../context/StoreContext';
 import {
   LayoutDashboard, Package, ShoppingBag, Wallet, TrendingUp,
   UserCircle, Plus, Edit2, Search, Bell, ChevronRight,
   ArrowUpRight, Zap, Check, ShieldCheck, X, RefreshCw, Loader2,
-  Trash2, Truck, BarChart2, DollarSign,
+  Trash2, Truck, DollarSign, Menu,
   AlertCircle, ArrowRight, ExternalLink,
   LayoutGrid, List, CheckCircle2,
   MoreVertical, Eye, Camera, MapPin, Phone, MessageCircle,
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { categories } from '../data/mockData';
 import { Product } from '../data/mockData';
@@ -64,6 +64,82 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Product Modal ────────────────────────────────────────────────────────────
+// Hoisted to module scope: defining these inside ProductModal made them a
+// fresh component type on every render (e.g. every keystroke elsewhere in
+// the form), so React unmounted/remounted their DOM on each change.
+function MediaUploader({
+  images, dragOver, setDragOver, handleDrop, galleryUploading, handleGalleryUpload, removeGalleryImage, moveImage,
+}: {
+  images: string[]; dragOver: boolean; setDragOver: (v: boolean) => void;
+  handleDrop: (e: React.DragEvent) => void; galleryUploading: boolean;
+  handleGalleryUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  removeGalleryImage: (idx: number) => void; moveImage: (from: number, to: number) => void;
+}) {
+  return (
+    <div
+      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      className="rounded-xl border-2 border-dashed transition-colors overflow-hidden"
+      style={{ borderColor: dragOver ? '#009739' : '#D1D5DB', background: dragOver ? 'rgba(0,151,57,0.03)' : '#FAFAFA' }}
+    >
+      {images.length === 0 ? (
+        <label className="flex flex-col items-center justify-center gap-3 py-10 cursor-pointer">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+            {galleryUploading ? <Loader2 className="w-6 h-6 text-[#009739] animate-spin" /> : <ImageIcon className="w-6 h-6 text-gray-400" />}
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-gray-700">{galleryUploading ? 'Uploading…' : 'Add media'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">or drop files to upload</p>
+          </div>
+          {!galleryUploading && (
+            <span className="px-4 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:border-[#009739] hover:text-[#009739] transition-colors">
+              Add files
+            </span>
+          )}
+          <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} disabled={galleryUploading} />
+        </label>
+      ) : (
+        <div className="p-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+            {images.map((url, idx) => (
+              <div key={idx} className="relative rounded-lg overflow-hidden bg-gray-100 group" style={{ aspectRatio: '1' }}>
+                <img src={url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                {idx === 0 && <span className="absolute top-1 left-1 bg-gray-900/70 text-white rounded px-1.5 py-0.5 text-[9px] font-bold leading-none">Featured</span>}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
+                  {idx > 0 && <button type="button" onClick={() => moveImage(idx, idx - 1)} className="w-6 h-6 rounded-full bg-white/90 text-gray-700 flex items-center justify-center border-none text-xs font-bold">‹</button>}
+                  <button type="button" onClick={() => removeGalleryImage(idx)} className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center border-none"><X className="w-3 h-3" /></button>
+                  {idx < images.length - 1 && <button type="button" onClick={() => moveImage(idx, idx + 1)} className="w-6 h-6 rounded-full bg-white/90 text-gray-700 flex items-center justify-center border-none text-xs font-bold">›</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+          {images.length < 8 ? (
+            <label className="flex items-center justify-center gap-2 w-full py-2 rounded-lg border border-dashed border-gray-300 text-xs font-semibold text-gray-500 hover:border-[#009739] hover:text-[#009739] cursor-pointer transition-colors bg-white">
+              {galleryUploading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Uploading…</> : <><Upload className="w-3.5 h-3.5" />Add more</>}
+              <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} disabled={galleryUploading} />
+            </label>
+          ) : <p className="text-xs text-gray-400 text-center">Maximum 8 images reached</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Toggle({ checked, label, onToggle }: { checked: boolean; label: string; onToggle: () => void }) {
+  return (
+    <div
+      className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0 cursor-pointer select-none"
+      onClick={onToggle}
+    >
+      <span className="text-sm text-gray-700">{label}</span>
+      <div className="w-10 h-5 rounded-full transition-colors relative shrink-0" style={{ background: checked ? '#009739' : '#d1d5db' }}>
+        <div className="w-4 h-4 rounded-full bg-white absolute top-0.5 shadow-sm transition-all duration-200" style={{ left: checked ? '22px' : '2px' }} />
+      </div>
+    </div>
+  );
+}
+
 function ProductModal({ product, onSave, onClose, userId }: {
   product?: Product; onSave: (d: Omit<Product, 'id'>) => void; onClose: () => void; userId?: string;
 }) {
@@ -158,82 +234,6 @@ function ProductModal({ product, onSave, onClose, userId }: {
     onClose();
   };
 
-  const F = (key: string, label: string, placeholder: string, type = 'text', req = false) => (
-    <div>
-      <label className="block text-xs text-gray-600 mb-1.5" style={{ fontWeight: 600 }}>
-        {label}{req && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      <input type={type} value={(form as any)[key]}
-        onChange={e => { setForm(f => ({ ...f, [key]: e.target.value })); setErrors(er => ({ ...er, [key]: '' })); }}
-        placeholder={placeholder}
-        className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:border-[#009739] transition-colors bg-gray-50 ${(errors as any)[key] ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
-      />
-      {(errors as any)[key] && <p className="text-xs text-red-500 mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{(errors as any)[key]}</p>}
-    </div>
-  );
-
-  const MediaUploader = () => (
-    <div
-      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={handleDrop}
-      className="rounded-xl border-2 border-dashed transition-colors overflow-hidden"
-      style={{ borderColor: dragOver ? '#009739' : '#D1D5DB', background: dragOver ? 'rgba(0,151,57,0.03)' : '#FAFAFA' }}
-    >
-      {form.images.length === 0 ? (
-        <label className="flex flex-col items-center justify-center gap-3 py-10 cursor-pointer">
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-            {galleryUploading ? <Loader2 className="w-6 h-6 text-[#009739] animate-spin" /> : <ImageIcon className="w-6 h-6 text-gray-400" />}
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold text-gray-700">{galleryUploading ? 'Uploading…' : 'Add media'}</p>
-            <p className="text-xs text-gray-400 mt-0.5">or drop files to upload</p>
-          </div>
-          {!galleryUploading && (
-            <span className="px-4 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:border-[#009739] hover:text-[#009739] transition-colors">
-              Add files
-            </span>
-          )}
-          <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} disabled={galleryUploading} />
-        </label>
-      ) : (
-        <div className="p-3">
-          <div className="grid grid-cols-4 gap-2 mb-3">
-            {form.images.map((url, idx) => (
-              <div key={idx} className="relative rounded-lg overflow-hidden bg-gray-100 group" style={{ aspectRatio: '1' }}>
-                <img src={url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                {idx === 0 && <span className="absolute top-1 left-1 bg-gray-900/70 text-white rounded px-1.5 py-0.5 text-[9px] font-bold leading-none">Featured</span>}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
-                  {idx > 0 && <button type="button" onClick={() => moveImage(idx, idx - 1)} className="w-6 h-6 rounded-full bg-white/90 text-gray-700 flex items-center justify-center border-none text-xs font-bold">‹</button>}
-                  <button type="button" onClick={() => removeGalleryImage(idx)} className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center border-none"><X className="w-3 h-3" /></button>
-                  {idx < form.images.length - 1 && <button type="button" onClick={() => moveImage(idx, idx + 1)} className="w-6 h-6 rounded-full bg-white/90 text-gray-700 flex items-center justify-center border-none text-xs font-bold">›</button>}
-                </div>
-              </div>
-            ))}
-          </div>
-          {form.images.length < 8 ? (
-            <label className="flex items-center justify-center gap-2 w-full py-2 rounded-lg border border-dashed border-gray-300 text-xs font-semibold text-gray-500 hover:border-[#009739] hover:text-[#009739] cursor-pointer transition-colors bg-white">
-              {galleryUploading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Uploading…</> : <><Upload className="w-3.5 h-3.5" />Add more</>}
-              <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} disabled={galleryUploading} />
-            </label>
-          ) : <p className="text-xs text-gray-400 text-center">Maximum 8 images reached</p>}
-        </div>
-      )}
-    </div>
-  );
-
-  const Toggle = ({ k, label }: { k: string; label: string }) => (
-    <div
-      className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0 cursor-pointer select-none"
-      onClick={() => setForm(f => ({ ...f, [k]: !(f as any)[k] }))}
-    >
-      <span className="text-sm text-gray-700">{label}</span>
-      <div className="w-10 h-5 rounded-full transition-colors relative shrink-0" style={{ background: (form as any)[k] ? '#009739' : '#d1d5db' }}>
-        <div className="w-4 h-4 rounded-full bg-white absolute top-0.5 shadow-sm transition-all duration-200" style={{ left: (form as any)[k] ? '22px' : '2px' }} />
-      </div>
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}>
       <div className="bg-[#F6F6F7] rounded-2xl w-full shadow-2xl flex flex-col" style={{ maxWidth: '900px', maxHeight: '94vh' }}>
@@ -296,14 +296,18 @@ function ProductModal({ product, onSave, onClose, userId }: {
                   <h3 className="text-sm font-semibold text-gray-900">Media</h3>
                   {form.images.length > 0 && <span className="text-xs text-gray-400">{form.images.length}/8 · first is featured</span>}
                 </div>
-                <MediaUploader />
+                <MediaUploader
+                  images={form.images} dragOver={dragOver} setDragOver={setDragOver} handleDrop={handleDrop}
+                  galleryUploading={galleryUploading} handleGalleryUpload={handleGalleryUpload}
+                  removeGalleryImage={removeGalleryImage} moveImage={moveImage}
+                />
                 <p className="text-xs text-gray-400 mt-2">JPG, PNG, WebP · Max 5 MB each</p>
               </div>
 
               {/* Pricing */}
               <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">Pricing</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Price (USD)<span className="text-red-500 ml-0.5">*</span></label>
                     <div className="relative">
@@ -396,8 +400,8 @@ function ProductModal({ product, onSave, onClose, userId }: {
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Badges</h3>
                 <p className="text-xs text-gray-400 mb-3">Shown on product cards and the product page</p>
-                <Toggle k="isNew" label="New arrival" />
-                <Toggle k="isDeal" label="Hot deal" />
+                <Toggle checked={form.isNew} label="New arrival" onToggle={() => setForm(f => ({ ...f, isNew: !f.isNew }))} />
+                <Toggle checked={form.isDeal} label="Hot deal" onToggle={() => setForm(f => ({ ...f, isDeal: !f.isDeal }))} />
                 <div className="pt-2">
                   <p className="text-xs text-gray-400">For Best Seller or Trending, add the tag <span className="font-mono bg-gray-100 px-1 rounded">bestseller</span> or <span className="font-mono bg-gray-100 px-1 rounded">trending</span></p>
                 </div>
@@ -603,6 +607,7 @@ function ChartTooltip({ active, payload, label, prefix = '$' }: any) {
 // ─── Main SellerDashboard ─────────────────────────────────────────────────────
 export function SellerDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     user, formatPrice, currency, toggleCurrency, sellerDbId,
     sellerProducts, addSellerProduct, updateSellerProduct, toggleProductStock, removeSellerProduct,
@@ -610,12 +615,24 @@ export function SellerDashboard() {
     onboardingStatus, updateProfile,
   } = useStore();
 
-  const [tab, setTab] = useState<Tab>('overview');
+  const VALID_TABS: Tab[] = ['overview', 'products', 'orders', 'payments', 'analytics', 'profile', 'notifications', 'quotations'];
+  const initialTab: Tab = VALID_TABS.includes(searchParams.get('tab') as Tab) ? (searchParams.get('tab') as Tab) : 'overview';
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  // React to ?tab= changes even when this page is already mounted (e.g.
+  // clicking a notification in the header bell while already on this page).
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && VALID_TABS.includes(tabParam as Tab)) setTab(tabParam as Tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.toString()]);
+
   const [sellerOrders, setSellerOrders] = useState<SellerOrderItem[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [sellerQuotations, setSellerQuotations] = useState<QuotationRequest[]>([]);
   const [quotationsLoading, setQuotationsLoading] = useState(true);
   const [notifFilter, setNotifFilter] = useState<'all' | 'order' | 'system' | 'promo' | 'quotation' | 'unread'>('all');
+  const [quotationFilter, setQuotationFilter] = useState<'all' | 'pending' | 'replied' | 'accepted' | 'declined'>('all');
 
   // Settings tab state
   const [settingsName, setSettingsName] = useState('');
@@ -709,9 +726,10 @@ export function SellerDashboard() {
   }, []);
   const [showWithdrawal, setShowWithdrawal] = useState(false);
   const [updatingOrder, setUpdatingOrder] = useState<Order | null>(null);
-  const [showNotifs, setShowNotifs] = useState(false);
   const [fulfillmentOrder, setFulfillmentOrder] = useState<TrackOrderData | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const sellerPending = onboardingStatus === 'pending';
+  const sellerApproved = onboardingStatus === 'approved';
 
   // Persistent order status overrides (Pending → Processing → Delivered flow)
   const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({});
@@ -744,12 +762,18 @@ export function SellerDashboard() {
   // Product search & view
   const [productSearch, setProductSearch] = useState('');
   const [productView, setProductView] = useState<'list' | 'grid'>('list');
+  const [productFilter, setProductFilter] = useState<'all' | 'inStock' | 'outOfStock'>('all');
   const [orderFilter, setOrderFilter] = useState('all');
 
   const allOrders = sellerOrders;
   const totalSales = allOrders.reduce((s, o) => s + o.price * o.quantity, 0);
   const platformFee = totalSales * 0.02;
   const netEarnings = totalSales - platformFee;
+  // Available balance is only funds actually released (escrow cleared) —
+  // netEarnings above includes orders still held in escrow.
+  const releasedOrders = allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'released');
+  const releasedNet = releasedOrders.reduce((s, o) => s + o.price * o.quantity * 0.98, 0);
+  const pendingPayoutNet = netEarnings - releasedNet;
 
   // ── Real chart data computed from orders ────────────────────────────────
   const REVENUE_DATA = useMemo(() => {
@@ -772,21 +796,28 @@ export function SellerDashboard() {
       : [{ month: 'No data', revenue: 0, orders: 0 }];
   }, [allOrders]);
 
-  const CATEGORY_DATA = useMemo(() => {
-    const cats: Record<string, number> = {};
-    sellerProducts.forEach(p => {
-      cats[p.category] = (cats[p.category] || 0) + p.price;
+  const WEEKLY_SALES_DATA = useMemo(() => {
+    const days: { key: string; label: string; sales: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push({ key: d.toISOString().slice(0, 10), label: d.toLocaleString('en', { weekday: 'short' }), sales: 0 });
+    }
+    allOrders.forEach(o => {
+      const d = new Date(o.date);
+      if (isNaN(d.getTime())) return;
+      const key = d.toISOString().slice(0, 10);
+      const day = days.find(x => x.key === key);
+      if (day) day.sales += 1;
     });
-    const sorted = Object.entries(cats)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([name, revenue]) => ({ name, revenue }));
-    return sorted.length > 0 ? sorted : [{ name: 'No products', revenue: 0 }];
-  }, [sellerProducts]);
+    return days;
+  }, [allOrders]);
 
-  const filteredProducts = sellerProducts.filter(p =>
-    !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.category.toLowerCase().includes(productSearch.toLowerCase())
-  );
+  const filteredProducts = sellerProducts
+    .filter(p => productFilter === 'all' || (productFilter === 'inStock' ? p.inStock : !p.inStock))
+    .filter(p =>
+      !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.category.toLowerCase().includes(productSearch.toLowerCase())
+    );
 
   const filteredOrders = useMemo(() => {
     if (orderFilter === 'all') return allOrders;
@@ -807,10 +838,11 @@ export function SellerDashboard() {
   const quickAction = (order: Order) => {
     const s = getStatus(order.orderId, order.escrowStatus);
     const next = STATUS_FLOW[STATUS_FLOW.indexOf(s) + 1];
-    if (!next || s === 'released' || s === 'delivery_confirmed' || s === 'awaiting_payment') return null;
+    if (!next || s === 'released' || s === 'awaiting_payment') return null;
     const LABELS: Record<string, string> = {
       payment_confirmed: 'Accept Order',
       funds_held: 'Mark Dispatched',
+      delivery_confirmed: 'Release Funds',
     };
     return { label: LABELS[s], next };
   };
@@ -832,8 +864,15 @@ export function SellerDashboard() {
     payments: 'Payments', analytics: 'Analytics', profile: 'Profile', notifications: 'Notifications',
   };
 
+  // Matches the admin dashboard's filter-pill styling exactly, for visual
+  // consistency between the two dashboards' tab content.
+  const filterTabCls = (active: boolean) =>
+    `px-3 py-1.5 rounded-lg text-xs cursor-pointer border transition-all ${
+      active ? 'bg-white border-[#EAEAEA] text-gray-900 shadow-sm' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700'
+    }`;
+
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-white overflow-x-hidden">
 
       {showWithdrawal && <WithdrawalModal balance={netEarnings} onClose={() => setShowWithdrawal(false)} formatPrice={formatPrice} />}
       {fulfillmentOrder && (
@@ -854,33 +893,6 @@ export function SellerDashboard() {
           onClose={() => setUpdatingOrder(null)}
         />
       )}
-
-      {/* ── Notifications dropdown ── */}
-      {showNotifs && (
-        <div className="fixed inset-0 z-50 flex items-start justify-end pt-16 pr-6" onClick={() => setShowNotifs(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl border border-[#EAEAEA] w-80 overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-4 py-3.5 border-b border-[#EAEAEA] flex items-center justify-between">
-              <p className="text-sm text-gray-900" style={{ fontWeight: 700 }}>Notifications</p>
-              <button onClick={() => { markAllRead(); }} className="text-xs text-[#009739] bg-transparent border-none cursor-pointer p-0" style={{ fontWeight: 600 }}>Mark all read</button>
-            </div>
-            <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
-              {notifications.map(n => (
-                <div key={n.id} className="px-4 py-3 transition-colors" style={{ background: n.read ? '#fff' : 'rgba(0,151,57,0.03)' }}>
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 transition-colors" style={{ background: n.read ? '#e5e7eb' : '#009739' }} />
-                    <div>
-                      <p className="text-xs text-gray-900" style={{ fontWeight: 600 }}>{n.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.body}</p>
-                      <p className="text-[11px] text-gray-400 mt-1">{n.time}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
 
       {/* ─────────────── Sidebar ─────────────────────────────────────────────── */}
       {/* Mobile overlay */}
@@ -949,7 +961,7 @@ export function SellerDashboard() {
               <UserCircle style={{ width: 16, height: 16 }} className="shrink-0" />
               Profile
             </button>
-            <button onClick={() => navigate('/shop')}
+            <button onClick={() => navigate(sellerDbId ? `/store/${sellerDbId}` : '/shop')}
               className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all w-full text-left cursor-pointer border-none text-sm"
               style={{ color: '#9ca3af', fontWeight: 500 }}>
               <ExternalLink style={{ width: 16, height: 16 }} className="shrink-0" />
@@ -972,109 +984,40 @@ export function SellerDashboard() {
       </aside>
 
       {/* ─────────────── Main Content ─────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col bg-white md:ml-64 ml-0">
+      <div className="flex-1 flex flex-col min-w-0 bg-white md:ml-64 ml-0">
 
-        {/* Top header */}
-        <header className="sticky top-0 z-20 bg-white border-b border-[#EAEAEA] px-4 md:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Mobile sidebar toggle */}
-            <button
-              onClick={() => setShowMobileSidebar(true)}
-              className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-50 border-none bg-transparent cursor-pointer"
-              aria-label="Open navigation"
-            >
-              <BarChart2 style={{ width: 18, height: 18 }} />
-            </button>
-            <h1 className="text-gray-900" style={{ fontWeight: 800, fontSize: '1.05rem' }}>{TAB_LABELS[tab]}</h1>
-            {tab === 'orders' && needsActionCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: 'rgba(206,17,38,0.08)', color: '#CE1126', fontWeight: 700 }}>
-                {needsActionCount} need action
-              </span>
-            )}
-            {tab === 'payments' && paymentsBadge > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: 'rgba(0,151,57,0.08)', color: '#009739', fontWeight: 700 }}>
-                {paymentsBadge} to release
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Bell */}
-            <div className="relative">
-              <button onClick={() => { setShowNotifs(!showNotifs); markAllRead(); }}
-                className="relative p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors border-none bg-transparent cursor-pointer">
-                <Bell style={{ width: 18, height: 18 }} />
-                {unreadCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 bg-[#CE1126] text-white rounded-full min-w-[16px] h-4 flex items-center justify-center"
-                    style={{ fontSize: '9px', fontWeight: 700, padding: '0 3px' }}>
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* Contextual header action */}
-            {(tab === 'overview' || tab === 'products') && (
-              <button onClick={() => navigate('/seller/products/new')}
-                className="flex items-center gap-2 px-4 py-2 bg-[#009739] hover:bg-[#007f30] text-white rounded-lg transition-colors border-none cursor-pointer"
-                style={{ fontSize: '0.8rem', fontWeight: 700 }}>
-                <Plus style={{ width: 14, height: 14 }} /> Add Product
-              </button>
-            )}
-            {tab === 'payments' && (
-              <button onClick={() => setShowWithdrawal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-[#009739] hover:bg-[#007f30] text-white rounded-lg transition-colors border-none cursor-pointer"
-                style={{ fontSize: '0.8rem', fontWeight: 700 }}>
-                <Zap style={{ width: 14, height: 14 }} /> Withdraw
-              </button>
-            )}
-          </div>
-        </header>
-
-        {/* ─ Mobile tab strip (xs only) ─ */}
-        <div className="md:hidden overflow-x-auto border-b border-gray-100 bg-white">
-          <div className="flex gap-1 px-4 py-2 min-w-max">
-            {NAV.map(({ id, icon: Icon, label, badge, badgeColor }) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap cursor-pointer border-none transition-all relative"
-                style={{
-                  background: tab === id ? '#009739' : '#f3f4f6',
-                  color: tab === id ? '#fff' : '#6b7280',
-                  fontWeight: tab === id ? 700 : 500,
-                }}
-              >
-                <Icon style={{ width: 13, height: 13 }} />
-                {label}
-                {badge != null && (
-                  <span className="ml-0.5 px-1 py-0 rounded-full text-white" style={{ background: badgeColor, fontSize: '0.55rem', fontWeight: 700 }}>
-                    {badge}
-                  </span>
-                )}
-              </button>
-            ))}
-            <button
-              onClick={() => setTab('profile')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap cursor-pointer border-none transition-all"
-              style={{ background: tab === 'profile' ? '#009739' : '#f3f4f6', color: tab === 'profile' ? '#fff' : '#6b7280', fontWeight: tab === 'profile' ? 700 : 500 }}
-            >
-              <UserCircle style={{ width: 13, height: 13 }} />
-              Profile
-            </button>
-          </div>
+        {/* Mobile sidebar toggle — the only thing that lived in the removed header with no other access point */}
+        <div className="md:hidden px-4 py-3 border-b border-[#EAEAEA]">
+          <button
+            onClick={() => setShowMobileSidebar(true)}
+            className="p-2 rounded-lg text-gray-600 hover:bg-gray-50 border border-[#EAEAEA] bg-white cursor-pointer"
+            aria-label="Open navigation"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
         </div>
 
         {/* ─ Tab content ─ */}
-        <main className="flex-1 px-4 md:px-8 py-6 md:py-8">
+        <main className="flex-1 px-4 md:px-8 py-6 md:py-8 min-w-0">
+          {sellerPending && (
+            <div className="mb-5 rounded-2xl border border-[#FDE68A] bg-[#FEF9C3] p-4 text-sm text-[#92400E] flex items-start gap-3">
+              <span className="text-xl leading-none">⏳</span>
+              <div>
+                <p className="font-semibold">Seller application under review</p>
+                <p className="mt-1 text-sm text-[#78350F]">Your store is not live yet. You can manage your profile, but product listings will only be available after approval.</p>
+              </div>
+            </div>
+          )}
 
           {/* ══════════════════════════════════════════════════
               OVERVIEW
           ══════════════════════════════════════════════════ */}
           {tab === 'overview' && (
             <div className="flex flex-col gap-6">
+              <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{TAB_LABELS.overview}</h2>
 
               {/* KPI cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { label: 'Total Revenue', value: formatPrice(totalSales), icon: DollarSign, color: '#009739', bg: 'rgba(0,151,57,0.08)', delta: '+12%' },
                   { label: 'Net Earnings', value: formatPrice(netEarnings), icon: Wallet, color: '#009739', bg: 'rgba(0,151,57,0.08)', delta: '+12%' },
@@ -1083,7 +1026,7 @@ export function SellerDashboard() {
                 ].map(stat => {
                   const Icon = stat.icon;
                   return (
-                    <div key={stat.label} className="bg-white border border-[#EAEAEA] rounded-2xl p-5" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                    <div key={stat.label} className="bg-white border border-[#EAEAEA] rounded-2xl p-5 min-w-0" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                       <div className="flex items-center justify-between mb-4">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: stat.bg }}>
                           <Icon className="w-4 h-4" style={{ color: stat.color }} />
@@ -1102,9 +1045,9 @@ export function SellerDashboard() {
               </div>
 
               {/* Revenue sparkline + quick actions */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-full">
                 {/* Sparkline */}
-                <div className="md:col-span-2 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <div className="md:col-span-2 bg-white border border-[#EAEAEA] rounded-2xl p-6 min-w-0" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <div className="flex items-center justify-between mb-5">
                     <div>
                       <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Revenue Trend</p>
@@ -1135,7 +1078,13 @@ export function SellerDashboard() {
                 <div className="bg-white border border-[#EAEAEA] rounded-2xl p-5 flex flex-col gap-3" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Quick Actions</p>
                   {[
-                    { label: 'Add Product', icon: Plus, color: '#009739', bg: 'rgba(0,151,57,0.08)', action: () => navigate('/seller/products/new') },
+                    { label: sellerApproved ? 'Add Product' : 'Awaiting approval', icon: Plus, color: sellerApproved ? '#009739' : '#9CA3AF', bg: sellerApproved ? 'rgba(0,151,57,0.08)' : 'rgba(229,231,235,0.3)', action: () => {
+                      if (!sellerApproved) {
+                        toast.error('You can only add products after your seller application is approved.');
+                      } else {
+                        navigate('/seller/products/new');
+                      }
+                    } },
                     { label: 'Withdraw Funds', icon: Zap, color: '#856404', bg: 'rgba(255,209,0,0.12)', action: () => setShowWithdrawal(true) },
                     { label: 'View Orders', icon: ShoppingBag, color: '#4f46e5', bg: 'rgba(79,70,229,0.08)', action: () => setTab('orders') },
                     { label: 'Analytics', icon: TrendingUp, color: '#CE1126', bg: 'rgba(206,17,38,0.08)', action: () => setTab('analytics') },
@@ -1199,15 +1148,17 @@ export function SellerDashboard() {
           ══════════════════════════════════════════════════ */}
           {tab === 'products' && (
             <div className="flex flex-col gap-5">
+              <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{TAB_LABELS.products}</h2>
+
               {/* Stats strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-0 max-w-full">
                 {[
                   { label: 'Total', value: sellerProducts.length, color: '#111' },
                   { label: 'In Stock', value: inStockCount, color: '#009739' },
                   { label: 'Out of Stock', value: outOfStockCount, color: '#CE1126' },
                   { label: 'Active Deals', value: sellerProducts.filter(p => p.isDeal).length, color: '#856404' },
                 ].map(s => (
-                  <div key={s.label} className="bg-white border border-[#EAEAEA] rounded-2xl px-5 py-4 flex items-center gap-3" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <div key={s.label} className="bg-white border border-[#EAEAEA] rounded-2xl px-5 py-4 flex items-center gap-3 min-w-0" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                     <div className="flex-1">
                       <p style={{ fontSize: '1.5rem', fontWeight: 900, color: s.color }}>{s.value}</p>
                       <p className="text-gray-400" style={{ fontSize: '0.75rem' }}>{s.label}</p>
@@ -1216,38 +1167,46 @@ export function SellerDashboard() {
                 ))}
               </div>
 
+              {/* Filter pills + search — matches the admin dashboard's Stores/Users header row */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
+                  {([
+                    { id: 'all' as const, label: `All (${sellerProducts.length})` },
+                    { id: 'inStock' as const, label: `In Stock (${inStockCount})` },
+                    { id: 'outOfStock' as const, label: `Out of Stock (${outOfStockCount})` },
+                  ]).map(f => (
+                    <button key={f.id} onClick={() => setProductFilter(f.id)} className={`${filterTabCls(productFilter === f.id)} whitespace-nowrap`} style={{ fontWeight: productFilter === f.id ? 700 : 500 }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-2 border border-[#EAEAEA] rounded-xl px-3 py-2 bg-white flex-1 min-w-0">
+                    <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <input placeholder="Search products…" value={productSearch}
+                      onChange={e => setProductSearch(e.target.value)}
+                      className="bg-transparent border-none outline-none text-sm text-gray-900 placeholder-gray-400 w-full min-w-0"
+                    />
+                  </div>
+                  <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+                    {(['list', 'grid'] as const).map(v => (
+                      <button key={v} onClick={() => setProductView(v)}
+                        className="p-2 transition-colors cursor-pointer border-none"
+                        style={{ background: productView === v ? '#f3f4f6' : '#fff', color: productView === v ? '#111' : '#9ca3af' }}>
+                        {v === 'list' ? <List className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => navigate('/seller/products/new')}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-[#009739] hover:bg-[#007f30] text-white rounded-lg text-xs border-none cursor-pointer transition-colors shrink-0"
+                    style={{ fontWeight: 700 }}>
+                    <Plus className="w-3.5 h-3.5" /> Add
+                  </button>
+                </div>
+              </div>
+
               {/* Table */}
               <div className="bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                <div className="px-5 py-4 border-b border-[#EAEAEA] flex items-center justify-between gap-4">
-                  <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                    All Products <span className="text-gray-400" style={{ fontWeight: 400 }}>({filteredProducts.length})</span>
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50">
-                      <Search className="w-3.5 h-3.5 text-gray-400" />
-                      <input placeholder="Search products…" value={productSearch}
-                        onChange={e => setProductSearch(e.target.value)}
-                        className="bg-transparent border-none outline-none text-gray-700 placeholder-gray-400"
-                        style={{ fontSize: '0.8rem', width: 150 }}
-                      />
-                    </div>
-                    <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-                      {(['list', 'grid'] as const).map(v => (
-                        <button key={v} onClick={() => setProductView(v)}
-                          className="p-2 transition-colors cursor-pointer border-none"
-                          style={{ background: productView === v ? '#f3f4f6' : '#fff', color: productView === v ? '#111' : '#9ca3af' }}>
-                          {v === 'list' ? <List className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
-                        </button>
-                      ))}
-                    </div>
-                    <button onClick={() => navigate('/seller/products/new')}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-[#009739] hover:bg-[#007f30] text-white rounded-lg text-xs border-none cursor-pointer transition-colors"
-                      style={{ fontWeight: 700 }}>
-                      <Plus className="w-3.5 h-3.5" /> Add
-                    </button>
-                  </div>
-                </div>
-
                 {filteredProducts.length === 0 ? (
                   <div className="px-6 py-16 text-center">
                     <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
@@ -1319,37 +1278,25 @@ export function SellerDashboard() {
           ══════════════════════════════════════════════════ */}
           {tab === 'orders' && (
             <div className="flex flex-col gap-5">
+              <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{TAB_LABELS.orders}</h2>
               {ordersLoading && (
                 <div className="flex items-center justify-center py-12 gap-2 text-gray-400">
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span style={{ fontSize: '0.85rem' }}>Loading orders…</span>
                 </div>
               )}
-              {/* Filter tabs */}
-              <div className="flex gap-2 flex-wrap">
+              {/* Filter tabs — matches the admin dashboard's Orders tab styling */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
                 {[
-                  { value: 'all', label: 'All Orders', count: allOrders.length },
-                  { value: 'payment_confirmed', label: 'Accept', count: allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'payment_confirmed').length },
-                  { value: 'funds_held', label: 'Pack & Ship', count: allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'funds_held').length },
-                  { value: 'in_transit', label: 'In Transit', count: allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'in_transit').length },
-                  { value: 'delivery_confirmed', label: 'Delivered', count: allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'delivery_confirmed').length },
-                  { value: 'released', label: 'Paid Out', count: allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'released').length },
+                  { value: 'all', label: `All (${allOrders.length})` },
+                  { value: 'payment_confirmed', label: `Accept (${allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'payment_confirmed').length})` },
+                  { value: 'funds_held', label: `Pack & Ship (${allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'funds_held').length})` },
+                  { value: 'in_transit', label: `In Transit (${allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'in_transit').length})` },
+                  { value: 'delivery_confirmed', label: `Delivered (${allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'delivery_confirmed').length})` },
+                  { value: 'released', label: `Paid Out (${allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'released').length})` },
                 ].map(f => (
-                  <button key={f.value} onClick={() => setOrderFilter(f.value)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border transition-all cursor-pointer"
-                    style={{
-                      background: orderFilter === f.value ? '#009739' : '#fff',
-                      borderColor: orderFilter === f.value ? '#009739' : '#e5e7eb',
-                      color: orderFilter === f.value ? '#fff' : '#374151',
-                      fontSize: '0.78rem', fontWeight: 600,
-                    }}>
+                  <button key={f.value} onClick={() => setOrderFilter(f.value)} className={`${filterTabCls(orderFilter === f.value)} whitespace-nowrap`} style={{ fontWeight: orderFilter === f.value ? 700 : 500 }}>
                     {f.label}
-                    {f.count > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full"
-                        style={{ background: orderFilter === f.value ? 'rgba(255,255,255,0.25)' : '#f3f4f6', color: orderFilter === f.value ? '#fff' : '#6b7280', fontSize: '0.65rem', fontWeight: 700 }}>
-                        {f.count}
-                      </span>
-                    )}
                   </button>
                 ))}
               </div>
@@ -1451,12 +1398,13 @@ export function SellerDashboard() {
           ══════════════════════════════════════════════════ */}
           {tab === 'payments' && (
             <div className="flex flex-col gap-5">
+              <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{TAB_LABELS.payments}</h2>
               {/* Wallet card */}
               <div className="rounded-2xl p-7 text-white overflow-hidden relative" style={{ background: 'linear-gradient(135deg, #009739 0%, #006e2a 100%)' }}>
                 <div className="absolute right-0 top-0 w-64 h-64 rounded-full opacity-10" style={{ background: '#FFD100', transform: 'translate(30%, -40%)' }} />
                 <div className="relative z-10">
                   <p className="text-white/60 mb-2" style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Available Balance</p>
-                  <p className="text-white mb-1" style={{ fontSize: '2.8rem', fontWeight: 900, lineHeight: 1 }}>{formatPrice(netEarnings)}</p>
+                  <p className="text-white mb-1" style={{ fontSize: '2.8rem', fontWeight: 900, lineHeight: 1 }}>{formatPrice(releasedNet)}</p>
                   <p className="text-white/50" style={{ fontSize: '0.8rem' }}>EcoCash · +263 77x xxx xxx</p>
                   <div className="flex gap-3 mt-5">
                     <button onClick={() => setShowWithdrawal(true)}
@@ -1469,11 +1417,11 @@ export function SellerDashboard() {
               </div>
 
               {/* Earnings breakdown */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 min-w-0 max-w-full">
                 {[
-                  { label: 'Gross Revenue', value: formatPrice(totalSales), sub: 'Before platform fee', color: '#111' },
-                  { label: 'Platform Fee (2%)', value: `-${formatPrice(platformFee)}`, sub: 'Deducted by Msika', color: '#CE1126' },
-                  { label: 'Net Earnings', value: formatPrice(netEarnings), sub: 'Available to withdraw', color: '#009739' },
+                  { label: 'Total earnings', value: formatPrice(netEarnings), sub: 'Lifetime, after platform fee', color: '#111' },
+                  { label: 'Pending payout', value: formatPrice(pendingPayoutNet), sub: 'Still held in escrow', color: '#C98A2D' },
+                  { label: 'Available balance', value: formatPrice(releasedNet), sub: 'Ready to withdraw', color: '#009739' },
                 ].map(s => (
                   <div key={s.label} className="bg-white border border-[#EAEAEA] rounded-2xl p-5" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                     <p style={{ fontSize: '1.4rem', fontWeight: 900, color: s.color }}>{s.value}</p>
@@ -1483,62 +1431,30 @@ export function SellerDashboard() {
                 ))}
               </div>
 
-              {/* Payment status table */}
-              <div className="bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                <div className="px-6 py-4 border-b border-[#EAEAEA] flex items-center justify-between">
-                  <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Payment Status by Order</p>
-                  <p className="text-xs text-gray-400">All transactions via EcoCash Escrow</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <div className="min-w-[560px]">
-                    {/* Table header */}
-                    <div className="px-6 py-2.5 bg-gray-50 border-b border-[#EAEAEA] grid grid-cols-6 gap-4">
-                      {['Order', 'Product', 'Date', 'Amount', 'Fee', 'Status'].map(h => (
-                        <p key={h} className="text-gray-400" style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</p>
-                      ))}
-                    </div>
-                    <div className="divide-y divide-gray-50">
-                      {allOrders.map(order => {
-                        const status = getStatus(order.orderId, order.escrowStatus);
-                        const gross = order.price * order.quantity;
-                        const fee = gross * 0.02;
-                        return (
-                          <div key={order.id} className="px-6 py-4 grid grid-cols-6 gap-4 items-center hover:bg-gray-50/50 transition-colors">
-                            <p className="text-gray-600 font-mono" style={{ fontSize: '0.75rem', fontWeight: 600 }}>#{order.orderId}</p>
-                            <div className="flex items-center gap-2 min-w-0">
-                              <img src={order.productImage} alt="" className="w-7 h-7 rounded-lg object-cover shrink-0" />
-                              <p className="text-gray-800 truncate" style={{ fontSize: '0.78rem', fontWeight: 600 }}>{order.productName}</p>
-                            </div>
-                            <p className="text-gray-400" style={{ fontSize: '0.75rem' }}>{order.date}</p>
-                            <p style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111' }}>{formatPrice(gross)}</p>
-                            <p style={{ fontWeight: 600, fontSize: '0.78rem', color: '#CE1126' }}>-{formatPrice(fee)}</p>
-                            <div className="flex items-center gap-2">
-                              <StatusBadge status={status} />
-                              {status === 'delivery_confirmed' && (
-                                <button onClick={() => updateOrderStatus(order.orderId, 'released')}
-                                  className="text-[10px] px-2 py-0.5 rounded-full bg-[#009739] text-white border-none cursor-pointer"
-                                  style={{ fontWeight: 700 }}>
-                                  Release
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <p className="text-gray-500" style={{ fontSize: '0.82rem' }}>
+                Payout method: EcoCash {settingsEcocash ? `+263 ${settingsEcocash}` : ''}
+              </p>
 
-              {/* Escrow explanation */}
-              <div className="p-4 rounded-2xl flex items-start gap-3" style={{ background: 'rgba(0,151,57,0.05)', border: '1px solid rgba(0,151,57,0.15)' }}>
-                <ShieldCheck className="w-5 h-5 text-[#009739] shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-gray-900" style={{ fontSize: '0.82rem', fontWeight: 700 }}>EcoCash Escrow Protection</p>
-                  <p className="text-gray-500 mt-1" style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>
-                    Buyer funds are held securely in escrow until the buyer confirms delivery. Once confirmed, funds are released to your EcoCash wallet within 24 hours. Msika deducts a 2% platform fee before releasing payment.
-                  </p>
+              {/* Payout history */}
+              <div className="bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <div className="grid grid-cols-3 px-6 py-3 bg-gray-50 border-b border-[#EAEAEA]">
+                  {['Date', 'Amount', 'Status'].map(h => (
+                    <p key={h} className="text-gray-400" style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</p>
+                  ))}
                 </div>
+                {releasedOrders.length === 0 ? (
+                  <p className="px-6 py-8 text-center text-gray-400" style={{ fontSize: '0.85rem' }}>No payouts yet.</p>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {releasedOrders.map(order => (
+                      <div key={order.id} className="grid grid-cols-3 px-6 py-3.5 items-center">
+                        <p className="text-gray-600" style={{ fontSize: '0.82rem' }}>{order.date}</p>
+                        <p className="text-gray-900" style={{ fontSize: '0.85rem', fontWeight: 700 }}>{formatPrice(order.price * order.quantity * 0.98)}</p>
+                        <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#009739' }}>Paid</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1548,122 +1464,36 @@ export function SellerDashboard() {
           ══════════════════════════════════════════════════ */}
           {tab === 'analytics' && (
             <div className="flex flex-col gap-5">
+              <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{TAB_LABELS.analytics}</h2>
               {/* KPI row */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 min-w-0 max-w-full">
                 {[
-                  { label: 'Total Revenue', value: formatPrice(totalSales), icon: DollarSign, color: '#009739', bg: 'rgba(0,151,57,0.08)', sub: 'All time' },
-                  { label: 'Orders Completed', value: String(allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'released').length), icon: CheckCircle2, color: '#009739', bg: 'rgba(0,151,57,0.08)', sub: 'Released' },
-                  { label: 'Avg. Order Value', value: formatPrice(totalSales / Math.max(allOrders.length, 1)), icon: BarChart2, color: '#4f46e5', bg: 'rgba(79,70,229,0.08)', sub: 'Per order' },
-                  { label: 'Products Listed', value: String(sellerProducts.length), icon: Package, color: '#856404', bg: 'rgba(255,209,0,0.12)', sub: `${inStockCount} in stock` },
-                ].map(({ label, value, icon: Icon, color, bg, sub }) => (
-                  <div key={label} className="bg-white border border-[#EAEAEA] rounded-2xl p-5" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  { label: 'Total sales', value: String(allOrders.length), icon: ShoppingBag, color: '#009739', bg: 'rgba(0,151,57,0.08)' },
+                  { label: 'Orders completed', value: String(allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === 'released').length), icon: CheckCircle2, color: '#009739', bg: 'rgba(0,151,57,0.08)' },
+                  { label: 'Avg. order value', value: formatPrice(totalSales / Math.max(allOrders.length, 1)), icon: DollarSign, color: '#4f46e5', bg: 'rgba(79,70,229,0.08)' },
+                ].map(({ label, value, icon: Icon, color, bg }) => (
+                  <div key={label} className="bg-white border border-[#EAEAEA] rounded-2xl p-5 min-w-0" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-4" style={{ background: bg }}>
                       <Icon className="w-4 h-4" style={{ color }} />
                     </div>
                     <p className="text-gray-900" style={{ fontWeight: 900, fontSize: '1.3rem' }}>{value}</p>
                     <p className="text-gray-500" style={{ fontSize: '0.78rem', fontWeight: 600 }}>{label}</p>
-                    <p className="text-gray-400" style={{ fontSize: '0.7rem' }}>{sub}</p>
                   </div>
                 ))}
               </div>
 
-              {/* Charts row */}
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-                {/* Revenue area chart */}
-                <div className="lg:col-span-3 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Monthly Revenue</p>
-                      <p className="text-gray-400 text-xs mt-0.5">Oct 2025 – Mar 2026</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,151,57,0.08)' }}>
-                      <ArrowUpRight className="w-3 h-3 text-[#009739]" />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#009739' }}>+71% vs Oct</span>
-                    </div>
-                  </div>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <AreaChart data={REVENUE_DATA} margin={{ top: 5, right: 5, bottom: 0, left: -25 }}>
-                      <defs>
-                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#009739" stopOpacity={0.15} />
-                          <stop offset="95%" stopColor="#009739" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Area type="monotone" dataKey="revenue" stroke="#009739" strokeWidth={2.5} fill="url(#areaGrad)" dot={{ fill: '#009739', r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: '#009739' }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Category bar chart */}
-                <div className="lg:col-span-2 bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                  <p className="text-gray-900 mb-1" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Revenue by Category</p>
-                  <p className="text-gray-400 text-xs mb-5">Top performing segments</p>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={CATEGORY_DATA} layout="vertical" margin={{ top: 0, right: 5, bottom: 0, left: -10 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={75} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Bar dataKey="revenue" radius={[0, 6, 6, 0]} maxBarSize={20}>
-                        {CATEGORY_DATA.map((_, i) => (
-                          <Cell key={i} fill={i === 0 ? '#009739' : i === 1 ? '#FFD100' : '#e5e7eb'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Order fulfillment funnel */}
+              {/* Weekly sales chart */}
               <div className="bg-white border border-[#EAEAEA] rounded-2xl p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                <p className="text-gray-900 mb-5" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Order Fulfillment Pipeline</p>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                  {STATUS_FLOW.map((s) => {
-                    const count = allOrders.filter(o => getStatus(o.orderId, o.escrowStatus) === s).length;
-                    const m = ESCROW_META[s];
-                    const pct = (count / allOrders.length) * 100 || 0;
-                    return (
-                      <div key={s} className="text-center">
-                        <div className="relative h-20 bg-gray-100 rounded-xl overflow-hidden mb-2 flex items-end">
-                          <div className="w-full rounded-xl transition-all duration-500"
-                            style={{ height: `${Math.max(pct, 8)}%`, background: count > 0 ? '#009739' : '#e5e7eb' }} />
-                          <span className="absolute inset-0 flex items-center justify-center text-lg" style={{ fontWeight: 900, color: count > 0 ? '#009739' : '#d1d5db' }}>{count}</span>
-                        </div>
-                        <p className="text-gray-600 leading-tight" style={{ fontSize: '0.7rem', fontWeight: 600 }}>{m.label}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Top products */}
-              <div className="bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                <div className="px-6 py-4 border-b border-[#EAEAEA]">
-                  <p className="text-gray-900" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Top Products by Revenue</p>
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {sellerProducts.slice(0, 5).map((p, idx) => {
-                    const rev = p.price * (5 - idx);
-                    const maxRev = sellerProducts.slice(0, 5)[0]?.price * 5 || 1;
-                    return (
-                      <div key={p.id} className="px-6 py-3.5 flex items-center gap-4">
-                        <span className="text-gray-300 shrink-0" style={{ fontWeight: 700, fontSize: '0.75rem', width: 16 }}>#{idx + 1}</span>
-                        <img src={p.image} alt={p.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-gray-900 truncate" style={{ fontSize: '0.82rem', fontWeight: 600 }}>{p.name}</p>
-                          <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden" style={{ width: '100%' }}>
-                            <div className="h-full rounded-full bg-[#009739] transition-all" style={{ width: `${(rev / maxRev) * 100}%` }} />
-                          </div>
-                        </div>
-                        <span style={{ fontWeight: 800, color: '#009739', fontSize: '0.85rem', minWidth: 60, textAlign: 'right' }}>{formatPrice(rev)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <p className="text-gray-900 mb-5" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Sales, last 7 days</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={WEEKLY_SALES_DATA} margin={{ top: 5, right: 5, bottom: 0, left: -25 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="sales" radius={[6, 6, 0, 0]} fill="#009739" maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           )}
@@ -1673,6 +1503,7 @@ export function SellerDashboard() {
           ══════════════════════════════════════════════════ */}
           {tab === 'profile' && (
             <div className="max-w-3xl flex flex-col gap-6">
+              <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{TAB_LABELS.profile}</h2>
 
               {/* ── Cover + Avatar card ── */}
               <div className="bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
@@ -1909,7 +1740,7 @@ export function SellerDashboard() {
             return (
               <div>
                 <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-                  <h2 className="text-gray-900" style={{ fontSize: '1.3rem', fontWeight: 800 }}>Notifications</h2>
+                  <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{TAB_LABELS.notifications}</h2>
                   <button onClick={markAllRead}
                     className="text-xs px-3 py-1.5 rounded-lg border border-[#EAEAEA] text-gray-600 hover:bg-gray-50 cursor-pointer bg-white transition-colors"
                     style={{ fontWeight: 600 }}>
@@ -1982,11 +1813,12 @@ export function SellerDashboard() {
             };
             const waLink = (phone: string, productName: string) =>
               `https://wa.me/${phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(`Hi! Following up on your quote request for "${productName}".`)}`;
+            const filteredQuotations = quotationFilter === 'all' ? sellerQuotations : sellerQuotations.filter(q => q.status === quotationFilter);
 
             return (
               <div>
                 <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-                  <h2 className="text-gray-900" style={{ fontSize: '1.3rem', fontWeight: 800 }}>Quotation Requests</h2>
+                  <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>{TAB_LABELS.quotations}</h2>
                   <button onClick={refreshQuotations}
                     className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-[#EAEAEA] text-gray-600 hover:bg-gray-50 cursor-pointer bg-white transition-colors"
                     style={{ fontWeight: 600 }}>
@@ -1994,19 +1826,36 @@ export function SellerDashboard() {
                   </button>
                 </div>
 
+                {/* Filters — matches the seller dashboard's Notifications tab styling */}
+                <div className="flex gap-2 mb-6 flex-wrap">
+                  {([
+                    { id: 'all' as const, label: `All (${sellerQuotations.length})` },
+                    { id: 'pending' as const, label: `Pending (${sellerQuotations.filter(q => q.status === 'pending').length})` },
+                    { id: 'replied' as const, label: `Replied (${sellerQuotations.filter(q => q.status === 'replied').length})` },
+                    { id: 'accepted' as const, label: `Accepted (${sellerQuotations.filter(q => q.status === 'accepted').length})` },
+                    { id: 'declined' as const, label: `Declined (${sellerQuotations.filter(q => q.status === 'declined').length})` },
+                  ]).map(f => (
+                    <button key={f.id} onClick={() => setQuotationFilter(f.id)}
+                      className="px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border-none"
+                      style={{ background: quotationFilter === f.id ? '#009739' : '#f3f4f6', color: quotationFilter === f.id ? '#fff' : '#6b7280', fontWeight: quotationFilter === f.id ? 700 : 500 }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
                 {quotationsLoading ? (
                   <div className="flex items-center justify-center py-20">
                     <Loader2 className="w-6 h-6 text-gray-300 animate-spin" />
                   </div>
-                ) : sellerQuotations.length === 0 ? (
+                ) : filteredQuotations.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-center">
                     <MessageCircle className="w-10 h-10 text-gray-300 mb-3" />
-                    <p className="text-gray-900" style={{ fontWeight: 700 }}>No quotation requests yet</p>
-                    <p className="text-sm text-gray-400 mt-1">Buyers who request a custom quote on your products will show up here.</p>
+                    <p className="text-gray-900" style={{ fontWeight: 700 }}>{quotationFilter === 'all' ? 'No quotation requests yet' : 'No quotations match this filter'}</p>
+                    <p className="text-sm text-gray-400 mt-1">{quotationFilter === 'all' ? 'Buyers who request a custom quote on your products will show up here.' : 'Try a different filter.'}</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {sellerQuotations.map(q => {
+                    {filteredQuotations.map(q => {
                       const meta = QUOTE_STATUS_META[q.status] || QUOTE_STATUS_META.pending;
                       return (
                         <div key={q.id} className="bg-white border border-[#EAEAEA] rounded-2xl p-5" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>

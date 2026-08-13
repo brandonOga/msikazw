@@ -70,6 +70,7 @@ export function useProducts(options: UseProductsOptions = {}): UseProductsResult
           .range(from, to);
 
         if (options.category) query = query.eq('category', options.category);
+        if (options.sellerId) query = query.eq('seller_id', options.sellerId);
         if (options.search)   query = query.ilike('name', `%${options.search}%`);
 
         const { data, error: err, count } = await query;

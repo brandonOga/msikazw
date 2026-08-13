@@ -41,44 +41,35 @@ export async function updateSellerApplicationStatus(
 ) {
   if (!isSupabaseConfigured) return;
 
+  // Approve/reject go through service-role serverless endpoints: they need
+  // to resolve the seller's auth email (auth.admin.* requires the service
+  // role — it silently fails from this browser-side anon client) and, on
+  // approval, grant seller-role access, which the "own profile only" RLS
+  // policy on profiles blocks an admin's client from doing directly.
+  if (status === 'approved') {
+    const res = await fetch('/api/admin/approve-seller', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sellerId: id, reviewNotes }),
+    }).catch(err => { console.error('[admin] approve-seller request failed:', err); return null; });
+    if (!res || !res.ok) console.error('[admin] approve-seller failed:', res?.status, await res?.text().catch(() => ''));
+    return;
+  }
+
+  if (status === 'rejected') {
+    const res = await fetch('/api/admin/reject-seller', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sellerId: id, reason: reviewNotes }),
+    }).catch(err => { console.error('[admin] reject-seller request failed:', err); return null; });
+    if (!res || !res.ok) console.error('[admin] reject-seller failed:', res?.status, await res?.text().catch(() => ''));
+    return;
+  }
+
   const update: Record<string, unknown> = { status };
   if (reviewNotes) update.review_notes = reviewNotes;
-
   const { error } = await supabase.from('sellers').update(update).eq('id', id);
   if (error) console.error('[admin] updateSellerApplicationStatus:', error);
-
-  // If approved, also update the user's role in profiles
-  if (status === 'approved' || status === 'rejected') {
-    const { data: seller } = await supabase
-      .from('sellers')
-      .select('user_id, reference_no, profiles(name)')
-      .eq('id', id)
-      .single();
-
-    if (seller?.user_id) {
-      if (status === 'approved') {
-        await supabase.from('profiles').update({ role: 'seller' }).eq('id', seller.user_id);
-      }
-
-      // Send status notification email (non-blocking)
-      const { data: authUser } = await supabase.auth.admin.getUserById(seller.user_id).catch(() => ({ data: null }));
-      const email = authUser?.user?.email;
-      const name = (seller.profiles as unknown as Record<string, string> | null)?.name || 'Seller';
-      const referenceNo = seller.reference_no as string;
-      if (email && referenceNo && typeof window !== 'undefined') {
-        fetch('/api/send-seller-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: email,
-            name,
-            referenceNumber: referenceNo,
-            type: status === 'approved' ? 'application_approved' : 'application_rejected',
-          }),
-        }).catch(err => console.warn('[admin] notify email error', err));
-      }
-    }
-  }
 }
 
 // ── Platform-wide stats ───────────────────────────────────────────────────────

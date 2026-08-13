@@ -68,15 +68,15 @@ export function PhoneInput({
   selectClassName = '',
 }: PhoneInputProps) {
   return (
-    <div className={`flex gap-2 ${className}`}>
+    <div className={`flex gap-2 min-w-0 ${className}`}>
       <select
         value={code}
         onChange={e => onCodeChange(e.target.value)}
         disabled={disabled}
-        className={`border rounded-lg bg-gray-50 text-gray-900 focus:outline-none transition-colors px-2 shrink-0 ${
+        className={`border rounded-lg bg-gray-50 text-gray-900 focus:outline-none transition-colors px-2.5 shrink-0 ${
           error ? 'border-red-400' : 'border-gray-200 focus:border-[#009739]'
         } ${selectClassName}`}
-        style={{ width: 88, fontSize: '0.85rem' }}
+        style={{ minWidth: 108, fontSize: '0.85rem' }}
       >
         {AFRICAN_CODES.map(c => (
           <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
@@ -88,7 +88,7 @@ export function PhoneInput({
         onChange={e => onNumberChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`flex-1 bg-gray-50 border rounded-lg px-3 py-2.5 text-sm text-gray-900 outline-none transition-colors ${
+        className={`flex-1 min-w-0 bg-gray-50 border rounded-lg px-3 py-2.5 text-sm text-gray-900 outline-none transition-colors ${
           error ? 'border-red-400' : 'border-gray-200 focus:border-[#009739]'
         } ${inputClassName}`}
       />

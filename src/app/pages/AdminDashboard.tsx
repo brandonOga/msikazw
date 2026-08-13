@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router';
 import {
   LayoutDashboard, Store, Users, ShoppingBag, AlertTriangle,
   CreditCard, Settings, Search, Shield, Loader2,
   CheckCircle, XCircle, Eye, ArrowLeft, X,
   Mail, Phone, MapPin, MessageCircle, FileText,
-  Package, TrendingUp, UserPlus, Bell, Trash2,
+  Package, TrendingUp, UserPlus, Bell, Trash2, ChevronRight,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { ADMIN_HEADER_H } from '../AdminLayout';
@@ -96,7 +97,8 @@ const Toggle = ({ val, set }: { val: boolean; set: (v: boolean) => void }) => (
 );
 
 export const AdminDashboard = () => {
-  const { user, authLoading, notifications, unreadCount, markAllRead, addNotification } = useStore();
+  const { user, authLoading, notifications, unreadCount, markAllRead, markNotificationRead, addNotification } = useStore();
+  const [searchParams] = useSearchParams();
 
   const [applications, setApplications] = useState<SellerApplicationData[]>([]);
   const [disputes,     setDisputes]     = useState<Dispute[]>([]);
@@ -107,11 +109,31 @@ export const AdminDashboard = () => {
   const [chartData,    setChartData]    = useState<DayRevenue[]>([]);
   const [loading,      setLoading]      = useState(true);
 
-  const [view,        setView]        = useState<AdminView>('overview');
+  const initialView: AdminView = NAV.some(n => n.id === searchParams.get('tab'))
+    ? (searchParams.get('tab') as AdminView)
+    : 'overview';
+  const initialStoreFilter: StoreFilter = (['all', 'pending', 'approved', 'suspended'] as string[]).includes(searchParams.get('filter') || '')
+    ? (searchParams.get('filter') as StoreFilter)
+    : 'all';
+
+  const [view,        setView]        = useState<AdminView>(initialView);
   const [notifFilter, setNotifFilter] = useState<'all' | 'order' | 'system' | 'promo' | 'unread'>('all');
-  const [storeFilter, setStoreFilter] = useState<StoreFilter>('all');
+  const [storeFilter, setStoreFilter] = useState<StoreFilter>(initialStoreFilter);
   const [storeSearch, setStoreSearch] = useState('');
   const [selectedApp, setSelectedApp] = useState<SellerApplicationData | null>(null);
+
+  // React to ?tab=/&filter= changes even when this page is already mounted
+  // (e.g. clicking a notification in the header bell while already on the
+  // dashboard doesn't remount the route, so a state initializer alone misses it).
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && NAV.some(n => n.id === tabParam)) setView(tabParam as AdminView);
+    const filterParam = searchParams.get('filter');
+    if (filterParam && (['all', 'pending', 'approved', 'suspended'] as string[]).includes(filterParam)) {
+      setStoreFilter(filterParam as StoreFilter);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.toString()]);
   const [userFilter,  setUserFilter]  = useState<UserFilter>('all');
   const [userSearch,  setUserSearch]  = useState('');
   const [orderFilter, setOrderFilter] = useState<OrderFilter>('all');
@@ -979,10 +1001,15 @@ export const AdminDashboard = () => {
                 <div className="bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   {filtered.map((n, idx) => {
                     const badge = typeBadge(n.type);
+                    const goesToStores = n.title === 'New Seller Application';
                     return (
-                      <div
+                      <button
                         key={n.id}
-                        className="flex items-start gap-4 px-5 py-4"
+                        onClick={() => {
+                          markNotificationRead(n.id);
+                          if (goesToStores) { setView('stores'); setStoreFilter('pending'); setSelectedApp(null); }
+                        }}
+                        className="w-full flex items-start gap-4 px-5 py-4 text-left cursor-pointer bg-transparent border-0 hover:bg-gray-50 transition-colors"
                         style={{
                           background: n.read ? '#fff' : 'rgba(0,151,57,0.03)',
                           borderBottom: idx < filtered.length - 1 ? '1px solid #f3f4f6' : 'none',
@@ -999,7 +1026,8 @@ export const AdminDashboard = () => {
                           <p className="text-sm text-gray-500 leading-relaxed">{n.body}</p>
                           <p className="text-xs text-gray-400 mt-1">{n.time}</p>
                         </div>
-                      </div>
+                        {goesToStores && <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mt-1" />}
+                      </button>
                     );
                   })}
                 </div>

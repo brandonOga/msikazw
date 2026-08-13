@@ -3,11 +3,11 @@ import logoFullColor from '../../assets/logo/msika-logo-full-color.svg';
 import logoReverse from '../../assets/logo/msika-logo-reverse.svg';
 
 interface MsikaLogoProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   color?: 'dark' | 'light';
 }
 
-const HEIGHTS = { sm: 16, md: 20, lg: 26 };
+const HEIGHTS = { sm: 16, md: 20, lg: 26, xl: 48 };
 
 export const MsikaLogo: React.FC<MsikaLogoProps> = ({ size = 'md', color = 'dark' }) => {
   const height = HEIGHTS[size];

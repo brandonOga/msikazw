@@ -258,8 +258,8 @@ export const LandingPage = () => {
             View all <ArrowRight className="w-4 h-4" />
           </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {[...products].sort((a, b) => b.rating - a.rating).slice(0, 4).map(product => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[...products].sort((a, b) => b.rating - a.rating).slice(0, 3).map(product => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
@@ -279,8 +279,8 @@ export const LandingPage = () => {
               View all <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {newProducts.slice(0, 4).map(product => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {newProducts.slice(0, 3).map(product => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
@@ -492,8 +492,8 @@ export const LandingPage = () => {
             View all <ArrowRight className="w-4 h-4" />
           </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {products.filter(p => p.isDeal || p.isNew).slice(0, 4).map(product => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {products.filter(p => p.isDeal || p.isNew).slice(0, 3).map(product => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>

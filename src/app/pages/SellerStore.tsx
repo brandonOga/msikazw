@@ -1,16 +1,20 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useProducts, useSellers } from '../../lib/hooks/useProducts';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import {
-  Star, CheckCircle, ChevronLeft, ChevronRight, ChevronDown,
+  Star, CheckCircle, ChevronLeft,
   Search, X, SlidersHorizontal, ArrowRight, MapPin, Clock,
   Send, ThumbsUp, BadgeCheck, MessageCircle, Package,
   Store as StoreIcon, PackageX,
 } from 'lucide-react';
 import { ProductCard } from '../components/ProductCard';
 import { StarRating } from '../components/StarRating';
-import { products } from '../data/mockData';
+import { SellerLogo } from '../components/SellerLogo';
+import { SellerBanner } from '../components/SellerBanner';
+import { FilterDropdown } from '../components/FilterDropdown';
+import { MobileFilterDrawer } from '../components/MobileFilterDrawer';
+import { products, categories } from '../data/mockData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ShopReview {
@@ -109,18 +113,16 @@ function ShopCard({ s }: { s: { id: string; name: string; logo: string; banner: 
   return (
     <button
       onClick={() => navigate(`/store/${s.id}`)}
-      className="group bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden text-left hover:shadow-[0_8px_32px_rgba(0,0,0,0.10)] hover:-translate-y-1 transition-all duration-300 cursor-pointer w-full"
+      className="group bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden text-left hover:shadow-[0_8px_32px_rgba(0,0,0,0.10)] hover:-translate-y-1 transition-all duration-300 cursor-pointer w-full flex flex-col"
       style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
       aria-label={`Visit ${s.name}`}
     >
       {/* Banner */}
-      <div className="relative overflow-hidden bg-gray-100" style={{ height: '130px' }}>
-        <img
+      <div className="relative overflow-hidden bg-gray-100 shrink-0" style={{ height: '130px' }}>
+        <SellerBanner
+          name={s.name}
           src={s.banner}
-          alt=""
-          aria-hidden="true"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
         />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent 60%)' }} />
         {/* Rating pill */}
@@ -142,19 +144,18 @@ function ShopCard({ s }: { s: { id: string; name: string; logo: string; banner: 
         )}
       </div>
       {/* Body */}
-      <div className="p-5">
+      <div className="p-5 flex-1 flex flex-col">
         <div className="-mt-10 relative mb-3">
-          <img
+          <SellerLogo
+            name={s.name}
             src={s.logo}
-            alt={s.name}
             className="w-14 h-14 rounded-2xl object-cover shadow-lg"
-            style={{ border: '3px solid #fff' }}
-            loading="lazy"
+            style={{ border: '3px solid #fff', fontSize: '1rem' }}
           />
         </div>
         <p className="text-gray-900 mb-0.5 truncate" style={{ fontSize: '1rem', fontWeight: 700 }}>{s.name}</p>
-        <p className="text-gray-500 mb-3" style={{ fontSize: '0.78rem' }}>{s.category}</p>
-        <div className="flex items-center gap-3 flex-wrap">
+        {s.category && <p className="text-gray-500 mb-3" style={{ fontSize: '0.78rem' }}>{s.category}</p>}
+        <div className="flex items-center gap-3 flex-wrap mb-4">
           <span className="flex items-center gap-1 text-gray-500" style={{ fontSize: '0.72rem' }}>
             <MapPin className="w-3 h-3 shrink-0" /> {s.location}
           </span>
@@ -162,7 +163,7 @@ function ShopCard({ s }: { s: { id: string; name: string; logo: string; banner: 
             <Package className="w-3 h-3 shrink-0" /> {productCount} items
           </span>
         </div>
-        <div className="mt-4 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid #f3f4f6' }}>
+        <div className="mt-auto pt-3 flex items-center justify-between" style={{ borderTop: '1px solid #f3f4f6' }}>
           <span className="text-gray-400" style={{ fontSize: '0.72rem' }}>Since {s.joined}</span>
           <span className="flex items-center gap-1 text-[#009739] group-hover:gap-2 transition-all" style={{ fontSize: '0.78rem', fontWeight: 700 }}>
             Visit shop <ArrowRight className="w-3.5 h-3.5" />
@@ -198,16 +199,7 @@ export function SellerStore() {
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [reviewError, setReviewError] = useState('');
 
-  const pillsRef = useRef<HTMLDivElement>(null);
-  const scrollPills = (dir: 'left' | 'right') => {
-    pillsRef.current?.scrollBy({ left: dir === 'left' ? -240 : 240, behavior: 'smooth' });
-  };
-
-  // Derive unique categories
-  const sellerCategories = useMemo(() => (
-    [...new Set(allSellerProducts.map(p => p.category))]
-  ), [allSellerProducts]);
-  const ALL_CATS = ['All', ...sellerCategories];
+  const ALL_CATS = ['All', ...categories.map(c => c.name)];
 
   // Filtered products
   const sellerProducts = useMemo(() => {
@@ -317,7 +309,7 @@ export function SellerStore() {
       ════════════════════════════════════════════════════════════════ */}
       <section style={{ background: '#111' }}>
         <div className="relative h-44 md:h-52 overflow-hidden">
-          <img src={seller.banner} alt="" aria-hidden="true" className="w-full h-full object-cover opacity-60" loading="lazy" />
+          <SellerBanner name={seller.name} src={seller.banner} className="w-full h-full object-cover opacity-60" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-[#111]" />
           <div className="absolute top-4 left-4">
             <button
@@ -332,11 +324,11 @@ export function SellerStore() {
 
         <div className="max-w-7xl mx-auto px-6 lg:px-10 pb-6">
           <div className="flex flex-col md:flex-row md:items-end gap-4 -mt-10 relative z-10">
-            <img
+            <SellerLogo
+              name={seller.name}
               src={seller.logo}
-              alt={seller.name}
               className="w-20 h-20 rounded-2xl object-cover shrink-0"
-              style={{ border: '3px solid rgba(255,255,255,0.12)', background: '#222' }}
+              style={{ border: '3px solid rgba(255,255,255,0.12)', background: '#222', fontSize: '1.4rem' }}
             />
             <div className="flex-1 pb-1">
               <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -364,136 +356,12 @@ export function SellerStore() {
               </div>
               <p className="mt-2" style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.45)', maxWidth: '540px' }}>{seller.description}</p>
             </div>
-
-            <div className="relative w-full md:w-64 shrink-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.35)' }} />
-              <input
-                type="text"
-                placeholder="Search this store…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 rounded-xl text-sm focus:outline-none transition-colors"
-                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white' }}
-                onFocus={e => { e.currentTarget.style.border = '1px solid #009739'; }}
-                onBlur={e => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'; }}
-              />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0">
-                  <X className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.4)' }} />
-                </button>
-              )}
-            </div>
           </div>
         </div>
       </section>
 
       {/* ════════════════════════════════════════════════════════════════
-          2. STICKY FILTER BAR
-      ════════════════════════════════════════════════════════════════ */}
-      <section className="sticky top-16 z-20 shadow-sm" style={{ background: '#0a0a0a', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="max-w-7xl mx-auto px-4 lg:px-10">
-          <div className="flex items-center gap-2 py-3">
-
-            <button onClick={() => scrollPills('left')} aria-label="Scroll left"
-              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)' }}>
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <div ref={pillsRef} className="flex items-center gap-2 flex-1 overflow-x-auto scrollbar-hide">
-              {ALL_CATS.map(cat => {
-                const isActive = cat === activeCategory;
-                return (
-                  <button key={cat} onClick={() => setActiveCategory(cat)}
-                    className="shrink-0 px-4 py-1.5 rounded-full cursor-pointer transition-all"
-                    style={{ fontSize: '0.78rem', fontWeight: isActive ? 700 : 500, background: isActive ? '#009739' : 'rgba(255,255,255,0.06)', color: isActive ? '#fff' : 'rgba(255,255,255,0.55)', border: isActive ? '1.5px solid #009739' : '1.5px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap' }}
-                    aria-pressed={isActive}>
-                    {cat}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button onClick={() => scrollPills('right')} aria-label="Scroll right"
-              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)' }}>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            <div className="w-px h-5 shrink-0 mx-1" style={{ background: 'rgba(255,255,255,0.12)' }} />
-
-            <div className="relative shrink-0 hidden md:block">
-              <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-2 rounded-full cursor-pointer focus:outline-none transition-all"
-                style={{ fontSize: '0.75rem', fontWeight: 600, background: sortBy !== 'default' ? '#009739' : 'rgba(255,255,255,0.06)', color: sortBy !== 'default' ? '#fff' : 'rgba(255,255,255,0.45)', border: sortBy !== 'default' ? 'none' : '1px solid rgba(255,255,255,0.12)' }}>
-                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ background: '#111', color: '#fff' }}>{o.label}</option>)}
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: sortBy !== 'default' ? '#fff' : 'rgba(255,255,255,0.35)' }} />
-            </div>
-
-            <div className="relative shrink-0 hidden md:block">
-              <select value={priceRange} onChange={e => setPriceRange(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-2 rounded-full cursor-pointer focus:outline-none transition-all"
-                style={{ fontSize: '0.75rem', fontWeight: 600, background: priceRange !== 'all' ? '#009739' : 'rgba(255,255,255,0.06)', color: priceRange !== 'all' ? '#fff' : 'rgba(255,255,255,0.45)', border: priceRange !== 'all' ? 'none' : '1px solid rgba(255,255,255,0.12)' }}>
-                {PRICE_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ background: '#111', color: '#fff' }}>{o.label}</option>)}
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: priceRange !== 'all' ? '#fff' : 'rgba(255,255,255,0.35)' }} />
-            </div>
-
-            <button onClick={() => setShowMobileFilters(true)}
-              className="md:hidden shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer transition-all"
-              style={{ fontSize: '0.78rem', fontWeight: 600, background: (sortBy !== 'default' || priceRange !== 'all') ? '#009739' : 'rgba(255,255,255,0.06)', color: (sortBy !== 'default' || priceRange !== 'all') ? '#fff' : 'rgba(255,255,255,0.55)', border: (sortBy !== 'default' || priceRange !== 'all') ? 'none' : '1.5px solid rgba(255,255,255,0.1)' }}>
-              <SlidersHorizontal className="w-3.5 h-3.5" /> Filters
-            </button>
-
-            {hasActiveFilters && (
-              <button onClick={clearFilters}
-                className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full cursor-pointer transition-all"
-                style={{ fontSize: '0.75rem', fontWeight: 600, color: '#CE1126', background: 'rgba(206,17,38,0.1)', border: '1.5px solid rgba(206,17,38,0.2)' }}>
-                <X className="w-3 h-3" /> Clear
-              </button>
-            )}
-
-            <div className="ml-auto shrink-0">
-              <span className="text-white" style={{ fontSize: '0.82rem', fontWeight: 700 }}>{sellerProducts.length}</span>
-              <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', marginLeft: '4px' }}>results</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Mobile filter drawer */}
-      {showMobileFilters && (
-        <>
-          <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowMobileFilters(false)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl p-5" style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-900" style={{ fontWeight: 800, fontSize: '1rem' }}>Filters & Sort</span>
-              <button onClick={() => setShowMobileFilters(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 border-none cursor-pointer bg-transparent"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Sort By</p>
-                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="w-full pl-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none cursor-pointer" style={{ fontSize: '0.85rem' }}>
-                  {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Price Range</p>
-                <select value={priceRange} onChange={e => setPriceRange(e.target.value)} className="w-full pl-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none cursor-pointer" style={{ fontSize: '0.85rem' }}>
-                  {PRICE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-              <button onClick={() => setShowMobileFilters(false)} className="w-full py-3 rounded-xl bg-[#009739] text-white cursor-pointer border-none" style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ════════════════════════════════════════════════════════════════
-          3. PRODUCTS GRID
+          2. PRODUCTS: sidebar filters + content
       ════════════════════════════════════════════════════════════════ */}
       <section className="border-t border-[#EAEAEA] py-14" aria-label="Store products">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -507,30 +375,229 @@ export function SellerStore() {
                 <h2 className="text-gray-900" style={{ fontSize: '1.4rem', fontWeight: 800 }}>Products from {seller.name}</h2>
               </div>
             </div>
-            <span className="text-gray-500" style={{ fontSize: '0.82rem' }}>
-              <span className="text-gray-900" style={{ fontWeight: 700 }}>{sellerProducts.length}</span> results
-            </span>
+            <button
+              onClick={() => setShowMobileFilters(true)}
+              className="md:hidden flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 bg-white text-gray-700 text-sm cursor-pointer"
+              style={{ fontWeight: 600 }}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="w-5 h-5 rounded-full bg-[#009739] text-white text-xs flex items-center justify-center" style={{ fontWeight: 700 }}>!</span>
+              )}
+            </button>
           </div>
 
-          {sellerProducts.length === 0 ? (
-            <div className="bg-white border border-[#EAEAEA] rounded-2xl p-16 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <PackageX className="w-9 h-9 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-900 mb-1" style={{ fontSize: '1rem', fontWeight: 700 }}>
-                {hasActiveFilters ? 'No products match your filters' : 'No products listed yet'}
-              </p>
+          <div className="flex gap-6 items-start">
+
+            {/* ─── Left Sidebar ─── */}
+            <aside className="hidden md:flex flex-col gap-3 w-56 shrink-0 sticky top-20">
+
+              {/* Search */}
+              <div className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search this store…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full pl-8 pr-7 py-2 rounded-lg text-sm border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#009739] transition-colors"
+                  />
+                  {search && (
+                    <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0 bg-transparent border-none cursor-pointer">
+                      <X className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Categories */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h3 className="text-gray-900" style={{ fontSize: '0.82rem', fontWeight: 700 }}>Categories</h3>
+                </div>
+                <ul className="max-h-72 overflow-y-auto">
+                  {ALL_CATS.map(cat => {
+                    const isActive = cat === activeCategory;
+                    return (
+                      <li key={cat}>
+                        <label
+                          className="w-full px-3 py-2 flex items-center gap-2.5 cursor-pointer transition-colors"
+                          style={{ background: isActive ? '#f0faf4' : 'transparent' }}
+                        >
+                          <input
+                            type="radio"
+                            name="store-category"
+                            checked={isActive}
+                            onChange={() => setActiveCategory(cat)}
+                            className="accent-[#009739]"
+                          />
+                          <span className="flex-1 truncate" style={{ fontSize: '0.8rem', fontWeight: isActive ? 700 : 400, color: isActive ? '#009739' : '#374151' }}>
+                            {cat}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              {/* Price Range */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h3 className="text-gray-900" style={{ fontSize: '0.82rem', fontWeight: 700 }}>Price</h3>
+                </div>
+                <div className="px-4 py-3 space-y-2.5">
+                  {PRICE_OPTIONS.map(opt => (
+                    <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="store-price"
+                        value={opt.value}
+                        checked={priceRange === opt.value}
+                        onChange={() => setPriceRange(opt.value)}
+                        className="accent-[#009739]"
+                      />
+                      <span style={{ fontSize: '0.82rem', fontWeight: priceRange === opt.value ? 600 : 400, color: priceRange === opt.value ? '#009739' : '#374151' }}>
+                        {opt.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Clear filters */}
               {hasActiveFilters && (
-                <button onClick={clearFilters} className="mt-4 px-5 py-2.5 bg-[#009739] text-white rounded-xl cursor-pointer border-none hover:bg-[#007f30] transition-colors" style={{ fontSize: '0.875rem', fontWeight: 600 }}>
-                  Clear filters
+                <button
+                  onClick={clearFilters}
+                  className="w-full py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5"
+                  style={{ fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  <X className="w-3.5 h-3.5" /> Clear All Filters
                 </button>
               )}
+            </aside>
+
+            {/* ─── Main content ─── */}
+            <div className="flex-1 min-w-0">
+
+              {/* Active filter chips + sort + result count */}
+              <div className="flex items-center justify-between gap-3 mb-5 pb-4 border-b border-gray-200 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {activeCategory !== 'All' && (
+                    <span className="flex items-center gap-1 px-2.5 py-1 bg-[#f0faf4] text-[#009739] rounded-full border border-[#009739]/20" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                      {activeCategory}
+                      <button onClick={() => setActiveCategory('All')} className="p-0 bg-transparent border-none cursor-pointer leading-none"><X className="w-3 h-3" /></button>
+                    </span>
+                  )}
+                  {priceRange !== 'all' && (
+                    <span className="flex items-center gap-1 px-2.5 py-1 bg-[#f0faf4] text-[#009739] rounded-full border border-[#009739]/20" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                      {PRICE_OPTIONS.find(o => o.value === priceRange)?.label}
+                      <button onClick={() => setPriceRange('all')} className="p-0 bg-transparent border-none cursor-pointer leading-none"><X className="w-3 h-3" /></button>
+                    </span>
+                  )}
+                  {search.trim() && (
+                    <span className="flex items-center gap-1 px-2.5 py-1 bg-[#f0faf4] text-[#009739] rounded-full border border-[#009739]/20" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                      "{search.trim()}"
+                      <button onClick={() => setSearch('')} className="p-0 bg-transparent border-none cursor-pointer leading-none"><X className="w-3 h-3" /></button>
+                    </span>
+                  )}
+                  <span className="text-gray-500" style={{ fontSize: '0.82rem' }}>
+                    <span className="text-gray-900" style={{ fontWeight: 700 }}>{sellerProducts.length}</span> results
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-gray-500 hidden sm:block" style={{ fontSize: '0.8rem' }}>Sort:</span>
+                  <FilterDropdown label="Sort by" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
+                </div>
+              </div>
+
+              {sellerProducts.length === 0 ? (
+                <div className="bg-white border border-[#EAEAEA] rounded-2xl p-16 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <PackageX className="w-9 h-9 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-900 mb-1" style={{ fontSize: '1rem', fontWeight: 700 }}>
+                    {hasActiveFilters ? 'No products match your filters' : 'No products listed yet'}
+                  </p>
+                  {hasActiveFilters && (
+                    <button onClick={clearFilters} className="mt-4 px-5 py-2.5 bg-[#009739] text-white rounded-xl cursor-pointer border-none hover:bg-[#007f30] transition-colors" style={{ fontSize: '0.875rem', fontWeight: 600 }}>
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {sellerProducts.map(product => <ProductCard key={product.id} product={product} />)}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {sellerProducts.map(product => <ProductCard key={product.id} product={product} />)}
-            </div>
-          )}
+          </div>
         </div>
       </section>
+
+      {/* Mobile filter drawer */}
+      <MobileFilterDrawer isOpen={showMobileFilters} onClose={() => setShowMobileFilters(false)}>
+        <div>
+          <p className="text-gray-500 mb-3" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Search</p>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search this store…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#009739]"
+            />
+          </div>
+        </div>
+        <div>
+          <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Category</p>
+          <ul className="max-h-56 overflow-y-auto rounded-xl border border-gray-200">
+            {ALL_CATS.map(cat => {
+              const isActive = cat === activeCategory;
+              return (
+                <li key={cat}>
+                  <label
+                    className="w-full px-3 py-2.5 flex items-center gap-2.5 cursor-pointer transition-colors"
+                    style={{ background: isActive ? '#f0faf4' : 'transparent' }}
+                  >
+                    <input
+                      type="radio"
+                      name="store-category-mobile"
+                      checked={isActive}
+                      onChange={() => setActiveCategory(cat)}
+                      className="accent-[#009739]"
+                    />
+                    <span style={{ fontSize: '0.85rem', fontWeight: isActive ? 700 : 400, color: isActive ? '#009739' : '#374151' }}>
+                      {cat}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        <div>
+          <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Sort By</p>
+          <FilterDropdown label="Sort by" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} minWidth="100%" />
+        </div>
+        <div>
+          <p className="text-gray-500 mb-2" style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Price Range</p>
+          <FilterDropdown label="Price range" value={priceRange} onChange={setPriceRange} options={PRICE_OPTIONS} minWidth="100%" />
+        </div>
+        {hasActiveFilters && (
+          <button onClick={clearFilters} className="w-full py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+            <X className="w-3.5 h-3.5 inline mr-1" /> Clear All Filters
+          </button>
+        )}
+        <button
+          onClick={() => setShowMobileFilters(false)}
+          className="w-full py-3 bg-[#009739] text-white rounded-xl transition-colors border-none"
+          style={{ fontWeight: 700, fontSize: '0.88rem' }}
+        >
+          Show {sellerProducts.length} Results
+        </button>
+      </MobileFilterDrawer>
 
       {/* ════════════════════════════════════════════════════════════════
           4. CUSTOMER REVIEWS
@@ -738,7 +805,7 @@ export function SellerStore() {
               View all <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {topRated.map(product => <ProductCard key={product.id} product={product} />)}
           </div>
         </div>
