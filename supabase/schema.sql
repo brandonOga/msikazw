@@ -628,3 +628,15 @@ $$;
 create or replace trigger on_seller_status_changed
   after update on public.sellers
   for each row execute procedure public.handle_seller_status_change();
+
+-- ── Migration: admins can update any profile ──────────────────────────────────
+-- Approving a seller needs to set profiles.role = 'seller' for the SELLER's
+-- profile, but the only update policy was "own profile only" — an admin's
+-- client had no RLS path to do this, so the role bump silently no-opped.
+drop policy if exists "Admin can update any profile" on public.profiles;
+create policy "Admin can update any profile"
+  on public.profiles for update using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+  ) with check (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+  );

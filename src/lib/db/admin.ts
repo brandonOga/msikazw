@@ -41,35 +41,35 @@ export async function updateSellerApplicationStatus(
 ) {
   if (!isSupabaseConfigured) return;
 
-  // Approve/reject go through service-role serverless endpoints: they need
-  // to resolve the seller's auth email (auth.admin.* requires the service
-  // role — it silently fails from this browser-side anon client) and, on
-  // approval, grant seller-role access, which the "own profile only" RLS
-  // policy on profiles blocks an admin's client from doing directly.
-  if (status === 'approved') {
-    const res = await fetch('/api/admin/approve-seller', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sellerId: id, reviewNotes }),
-    }).catch(err => { console.error('[admin] approve-seller request failed:', err); return null; });
-    if (!res || !res.ok) console.error('[admin] approve-seller failed:', res?.status, await res?.text().catch(() => ''));
-    return;
-  }
-
-  if (status === 'rejected') {
-    const res = await fetch('/api/admin/reject-seller', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sellerId: id, reason: reviewNotes }),
-    }).catch(err => { console.error('[admin] reject-seller request failed:', err); return null; });
-    if (!res || !res.ok) console.error('[admin] reject-seller failed:', res?.status, await res?.text().catch(() => ''));
-    return;
-  }
-
+  // The actual status change (and, on approval, the role bump) happens
+  // directly against Supabase under RLS — this must not depend on the
+  // /api/admin/* serverless endpoints being reachable (they aren't under
+  // plain `vite` dev without `vercel dev`, and shouldn't gate the core
+  // action even when they are reachable).
   const update: Record<string, unknown> = { status };
   if (reviewNotes) update.review_notes = reviewNotes;
-  const { error } = await supabase.from('sellers').update(update).eq('id', id);
-  if (error) console.error('[admin] updateSellerApplicationStatus:', error);
+  if (status === 'approved') update.approved_at = new Date().toISOString();
+  const { data: seller, error } = await supabase.from('sellers').update(update).eq('id', id).select('user_id').single();
+  if (error) { console.error('[admin] updateSellerApplicationStatus:', error); return; }
+
+  if (status === 'approved' && seller?.user_id) {
+    const { error: roleError } = await supabase.from('profiles').update({ role: 'seller' }).eq('id', seller.user_id);
+    if (roleError) console.error('[admin] failed to grant seller role:', roleError);
+  }
+
+  // Notify the seller by email — needs the service role to resolve their
+  // auth email, so this goes through the serverless endpoint. Best-effort:
+  // the status change above has already succeeded regardless of this.
+  if (status === 'approved' || status === 'rejected') {
+    const endpoint = status === 'approved' ? '/api/admin/approve-seller' : '/api/admin/reject-seller';
+    const body = status === 'approved' ? { sellerId: id, reviewNotes } : { sellerId: id, reason: reviewNotes };
+    fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(res => { if (!res.ok) console.warn(`[admin] ${endpoint} email step failed:`, res.status); })
+      .catch(err => console.warn(`[admin] ${endpoint} email step unreachable:`, err));
+  }
 }
 
 // ── Platform-wide stats ───────────────────────────────────────────────────────
