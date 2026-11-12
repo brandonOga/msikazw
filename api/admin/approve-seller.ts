@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!sellerId) return res.status(400).json({ error: 'Missing sellerId' })
   try {
     // fetch seller
-    const { data: s, error: sErr } = await adminSupabase.from('sellers').select('id, user_id, business_name, reference_no').eq('id', sellerId).maybeSingle()
+    const { data: s, error: sErr } = await adminSupabase.from('sellers').select('id, user_id, business_name, reference_no, profiles(email)').eq('id', sellerId).maybeSingle()
     if (sErr) throw sErr
     if (!s) return res.status(404).json({ error: 'Seller not found' })
 
@@ -29,21 +29,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await adminSupabase.from('profiles').update({ role: 'seller' }).eq('id', s.user_id)
 
     // notify seller via transactional email
-    let email: string | null = null
-    try {
-      const { data } = await adminSupabase.auth.admin.getUserById(s.user_id)
-      email = data?.user?.email || null
-    } catch (e) {
-      console.warn('approve-seller: failed to resolve user', s.user_id)
-    }
+    const email: string | null = (s.profiles as unknown as { email: string } | null)?.email || null
     if (email) {
       const subject = `🎉 Your Msika seller account is approved — ${s.reference_no || s.id}`
       const html = `<p>Hi ${s.business_name || 'Seller'},</p><p>Your seller application <strong>${s.reference_no || s.id}</strong> has been approved. Your store is now live.</p>`
-      try {
-        await sendTransactionalEmail({ to: email, subject, html })
-      } catch (e) {
-        console.error('approve-seller: failed to send email', e)
-      }
+      await sendTransactionalEmail({ to: email, subject, html }).catch(e => console.error('approve-seller: failed to send email', e))
     }
 
     return res.status(200).json({ ok: true })

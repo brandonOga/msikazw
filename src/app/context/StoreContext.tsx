@@ -7,6 +7,7 @@ import * as sellersDb from '../../lib/db/sellers';
 import * as productsDb from '../../lib/db/products';
 import * as quotationsDb from '../../lib/db/quotations';
 import { fetchZigRate } from '../../lib/exchange';
+import { sendTransactionalEmail } from '../../lib/email';
 import { toast } from 'sonner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -745,6 +746,13 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const addPlacedOrder = async (order: PlacedOrder) => {
     setPlacedOrders(prev => [order, ...prev]);
     addNotification({ type: 'order', title: 'Order Placed!', body: `Your order #${order.id} is confirmed.` });
+    if (user?.email) {
+      sendTransactionalEmail({
+        to: user.email,
+        subject: `Order confirmed — #${order.id}`,
+        html: `<p>Hi ${user.name},</p><p>Your order <strong>#${order.id}</strong> has been placed and is confirmed.</p><p>Total: $${order.total.toFixed(2)}</p><p>You'll receive updates as it progresses.</p><p>— Msika Team</p>`,
+      }).catch(() => {});
+    }
     // Persist to Supabase if user is logged in
     if (user?.id && isSupabaseConfigured) {
       const saved = await ordersDb.createOrder(user.id, order);
@@ -760,6 +768,13 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       o.id === orderId ? { ...o, status: 'delivered', escrowStatus: 'released' } : o
     ));
     addNotification({ type: 'order', title: 'Delivery Confirmed', body: `Funds released to seller for order #${orderId}.` });
+    if (user?.email) {
+      sendTransactionalEmail({
+        to: user.email,
+        subject: `Delivery confirmed — Order #${orderId}`,
+        html: `<p>Hi ${user.name},</p><p>You've confirmed delivery for order <strong>#${orderId}</strong>. Funds have been released to the seller. Thank you for shopping on Msika!</p><p>— Msika Team</p>`,
+      }).catch(() => {});
+    }
     if (isSupabaseConfigured) {
       ordersDb.updateOrderStatus(orderId, { status: 'delivered', escrow_status: 'released' });
     }
@@ -941,7 +956,16 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     setQuotations(prev => [localEntry, ...prev]);
     if (user?.id && isSupabaseConfigured) {
       const saved = await quotationsDb.createQuotation(user.id, q);
-      if (saved) setQuotations(prev => [saved, ...prev.filter(x => x.id !== localEntry.id)]);
+      if (saved) {
+        setQuotations(prev => [saved, ...prev.filter(x => x.id !== localEntry.id)]);
+        if (saved.productId) {
+          fetch('/api/notify-quotation-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event: 'new_request', productId: saved.productId, buyerName: saved.buyerName, productName: saved.productName, quantity: saved.quantity }),
+          }).catch(() => {});
+        }
+      }
     }
   };
 

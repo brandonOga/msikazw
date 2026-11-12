@@ -711,6 +711,11 @@ export function SellerDashboard() {
   const respondToQuotation = async (id: string, status: QuotationRequest['status']) => {
     setSellerQuotations(prev => prev.map(q => (q.id === id ? { ...q, status } : q)));
     await quotationsDb.updateQuotationStatus(id, status);
+    fetch('/api/notify-quotation-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'status_change', quotationId: id, status }),
+    }).catch(() => {});
   };
 
   // Show a bottom toast once when seller lands on dashboard with pending status

@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { data: admins, error } = await adminSupabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, email')
       .eq('role', 'admin')
     if (error) throw error
     if (!admins || admins.length === 0) {
@@ -74,8 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const results = await Promise.all((admins || []).map(async admin => {
       try {
-        const { data } = await adminSupabase.auth.admin.getUserById(admin.id)
-        const email = data?.user?.email
+        const email = (admin as unknown as { email: string }).email
         if (!email) return { adminId: admin.id, ok: false, error: 'no-email' }
         const r = await sendWithRetries(email)
         return { adminId: admin.id, ok: r.ok, error: r.error }
