@@ -7,9 +7,10 @@ import {
 import { useStore } from '../context/StoreContext';
 import { MsikaLogo } from './MsikaLogo';
 import { useProducts, useTrendingCategories } from '../../lib/hooks/useProducts';
+import { getNotificationDestination } from '../../lib/notificationDestination';
 
 export const Navbar = () => {
-  const { user, logout, cartItemsCount, openCart, currency, toggleCurrency, formatPrice, notifications, unreadCount, markAllRead } = useStore();
+  const { user, logout, cartItemsCount, openCart, currency, toggleCurrency, formatPrice, notifications, unreadCount, markAllRead, markNotificationRead } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,7 +180,7 @@ export const Navbar = () => {
                 {/* Notification bell */}
                 <div className="relative" ref={notifsRef}>
                   <button
-                    onClick={() => { setShowNotifs(!showNotifs); if (!showNotifs) markAllRead(); }}
+                    onClick={() => setShowNotifs(!showNotifs)}
                     className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
                     aria-label="Notifications"
                   >
@@ -208,20 +209,24 @@ export const Navbar = () => {
                           {notifications.length === 0 ? (
                             <p className="text-sm text-gray-400 text-center py-8">No notifications</p>
                           ) : notifications.map(n => (
-                            <div
+                            <button
                               key={n.id}
-                              className="px-4 py-3 border-b border-gray-50 last:border-0"
+                              onClick={() => {
+                                markNotificationRead(n.id);
+                                setShowNotifs(false);
+                                const { path, params } = getNotificationDestination(n, user?.role === 'admin' ? 'admin' : user?.role === 'seller' ? 'seller' : 'buyer');
+                                navigate(params ? `${path}?${new URLSearchParams(params)}` : path);
+                              }}
+                              className="w-full flex items-start gap-2 px-4 py-3 border-0 border-b border-gray-50 last:border-b-0 text-left cursor-pointer bg-transparent hover:bg-gray-50 transition-colors"
                               style={{ background: n.read ? '#fff' : 'rgba(0,151,57,0.04)' }}
                             >
-                              <div className="flex items-start gap-2">
-                                <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: n.read ? '#d1d5db' : '#009739' }} />
-                                <div>
-                                  <p className="text-xs text-gray-900" style={{ fontWeight: 600 }}>{n.title}</p>
-                                  <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
-                                  <p className="text-[11px] text-gray-400 mt-1">{n.time}</p>
-                                </div>
+                              <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: n.read ? '#d1d5db' : '#009739' }} />
+                              <div>
+                                <p className="text-xs text-gray-900" style={{ fontWeight: 600 }}>{n.title}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
+                                <p className="text-[11px] text-gray-400 mt-1">{n.time}</p>
                               </div>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       </div>

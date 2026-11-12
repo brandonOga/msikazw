@@ -9,6 +9,7 @@ import { categories } from '../data/mockData';
 import { uploadProductImageWithProgress } from '../../lib/storage';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { createProduct, updateProduct, fetchProductById } from '../../lib/db/products';
+import * as sellersDb from '../../lib/db/sellers';
 import type { Product } from '../data/mockData';
 
 const DELIVERY_OPTIONS = ['Same-Day Delivery', 'Free Delivery', 'Home Delivery', 'Standard Delivery'];
@@ -26,10 +27,61 @@ type FormState = {
   images: string[];
 };
 
+// ── Reusable sub-components ───────────────────────────────────────────────────
+// Hoisted to module scope: defining these inside SellerProductEdit made them a
+// fresh component type on every render (e.g. every keystroke), so React
+// unmounted/remounted their <input> on each change and the field lost focus.
+function Field({ k, label, placeholder, type = 'text', required = false, form, setForm, errors, setErrors }: {
+  k: keyof FormState; label: string; placeholder: string; type?: string; required?: boolean;
+  form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>;
+  errors: Record<string, string>; setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      <input
+        type={type}
+        value={form[k] as string}
+        onChange={e => { setForm(f => ({ ...f, [k]: e.target.value })); setErrors(er => ({ ...er, [k]: '' })); }}
+        placeholder={placeholder}
+        className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#009739]/20 focus:border-[#009739] bg-white transition-colors ${errors[k] ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+      />
+      {errors[k] && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors[k]}</p>}
+    </div>
+  );
+}
+
+function Toggle({ k, label, description, form, setForm }: {
+  k: keyof FormState; label: string; description?: string;
+  form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium text-gray-700">{label}</p>
+        {description && <p className="text-xs text-gray-400 mt-0.5">{description}</p>}
+      </div>
+      <button
+        type="button"
+        onClick={() => setForm(f => ({ ...f, [k]: !(f[k] as boolean) }))}
+        className="shrink-0 w-10 h-5 rounded-full transition-colors relative border-none"
+        style={{ background: (form[k] as boolean) ? '#009739' : '#d1d5db' }}
+      >
+        <span
+          className="w-4 h-4 rounded-full bg-white absolute top-0.5 shadow-sm transition-all duration-200"
+          style={{ left: (form[k] as boolean) ? '22px' : '2px' }}
+        />
+      </button>
+    </div>
+  );
+}
+
 export function SellerProductEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, sellerDbId, addSellerProduct, updateSellerProduct } = useStore();
+  const { user, sellerDbId, onboardingStatus, addSellerProduct, updateSellerProduct } = useStore();
   const isEdit = !!id;
 
   const [loading, setLoading] = useState(isEdit);
@@ -47,6 +99,14 @@ export function SellerProductEdit() {
     paymentMethods: ['EcoCash'],
     images: [],
   });
+
+  // Prevent new product creation until the seller application is approved
+  useEffect(() => {
+    if (!isEdit && onboardingStatus !== 'approved') {
+      toast.error('You can only add new products after your seller application is approved.');
+      navigate('/seller-dashboard');
+    }
+  }, [isEdit, onboardingStatus, navigate]);
 
   // Load existing product when editing
   useEffect(() => {
@@ -135,7 +195,15 @@ export function SellerProductEdit() {
 
   const handleSave = async () => {
     if (!validate()) return;
-    if (!sellerDbId) { toast.error('Seller account not found — please reload'); return; }
+    let sellerId = sellerDbId;
+    if (!sellerId && user?.id) {
+      const seller = await sellersDb.fetchSellerByUserId(user.id);
+      sellerId = seller?.id || null;
+    }
+    if (!sellerId) {
+      toast.error('Seller account not found — please reload');
+      return;
+    }
 
     setSaving(true);
     const img = form.images[0] || '';
@@ -155,6 +223,12 @@ export function SellerProductEdit() {
       paymentMethods: form.paymentMethods,
     };
 
+    if (!isEdit && onboardingStatus !== 'approved') {
+      toast.error('You can only add new products after your seller application is approved.');
+      setSaving(false);
+      return;
+    }
+
     if (isEdit) {
       const updated = await updateProduct(id!, payload);
       if (updated) {
@@ -164,7 +238,7 @@ export function SellerProductEdit() {
         toast.error('Failed to save — please try again');
       }
     } else {
-      const created = await createProduct(sellerDbId, payload);
+      const created = await createProduct(sellerId, payload);
       if (created) {
         addSellerProduct(created);
         toast.success('Product added to your store');
@@ -176,44 +250,6 @@ export function SellerProductEdit() {
     setSaving(false);
   };
 
-  // ── Reusable sub-components ───────────────────────────────────────────────────
-  const Field = ({ k, label, placeholder, type = 'text', required = false }: {
-    k: keyof FormState; label: string; placeholder: string; type?: string; required?: boolean;
-  }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      <input
-        type={type}
-        value={form[k] as string}
-        onChange={e => { setForm(f => ({ ...f, [k]: e.target.value })); setErrors(er => ({ ...er, [k]: '' })); }}
-        placeholder={placeholder}
-        className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#009739]/20 focus:border-[#009739] bg-white transition-colors ${errors[k] ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
-      />
-      {errors[k] && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors[k]}</p>}
-    </div>
-  );
-
-  const Toggle = ({ k, label, description }: { k: keyof FormState; label: string; description?: string }) => (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <p className="text-sm font-medium text-gray-700">{label}</p>
-        {description && <p className="text-xs text-gray-400 mt-0.5">{description}</p>}
-      </div>
-      <button
-        type="button"
-        onClick={() => setForm(f => ({ ...f, [k]: !(f[k] as boolean) }))}
-        className="shrink-0 w-10 h-5 rounded-full transition-colors relative border-none"
-        style={{ background: (form[k] as boolean) ? '#009739' : '#d1d5db' }}
-      >
-        <span
-          className="w-4 h-4 rounded-full bg-white absolute top-0.5 shadow-sm transition-all duration-200"
-          style={{ left: (form[k] as boolean) ? '22px' : '2px' }}
-        />
-      </button>
-    </div>
-  );
 
   if (loading) {
     return (
@@ -272,7 +308,7 @@ export function SellerProductEdit() {
 
             {/* Title & Description */}
             <section className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-              <Field k="name" label="Title" placeholder="e.g. Wireless Earbuds Pro" required />
+              <Field k="name" label="Title" placeholder="e.g. Wireless Earbuds Pro" required form={form} setForm={setForm} errors={errors} setErrors={setErrors} />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Description<span className="text-red-500 ml-0.5">*</span>
@@ -464,6 +500,7 @@ export function SellerProductEdit() {
                 k="inStock"
                 label={form.inStock ? 'Active' : 'Draft'}
                 description={form.inStock ? 'Visible to customers' : 'Hidden from store'}
+                form={form} setForm={setForm}
               />
             </section>
 

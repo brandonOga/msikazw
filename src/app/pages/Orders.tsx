@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import {
-  Package, ChevronRight, ShieldCheck, Star, X, Loader2,
-  CheckCircle2, Clock, MapPin, Truck,
+  Package, ShieldCheck, Star, X, Loader2,
+  CheckCircle2, Truck,
 } from 'lucide-react';
 import { useStore, PlacedOrder, EscrowStatus } from '../context/StoreContext';
 import { useNavigate } from 'react-router';
@@ -160,54 +160,33 @@ function PlacedOrderCard({ order }: { order: PlacedOrder }) {
 
       <div className="bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         {/* Main row */}
-        <div className="p-5">
-          <div className="flex items-start gap-3.5">
-            {/* Product image */}
-            <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden bg-gray-100 shrink-0 cursor-pointer"
-              onClick={() => firstItem && navigate(`/product/${firstItem.product.id}`)}>
-              {firstItem && (
-                <img src={firstItem.product.image} alt={firstItem.product.name}
-                  className="w-full h-full object-cover" />
-              )}
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-gray-900 truncate" style={{ fontWeight: 700, fontSize: '0.92rem' }}>
-                    {firstItem?.product.name}
-                    {order.items.length > 1 && (
-                      <span className="text-gray-400 text-xs" style={{ fontWeight: 500 }}>
-                        {' '}+{order.items.length - 1} more
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-gray-400 text-xs mt-0.5">
-                    {firstItem?.product.sellerName} · #{order.id} · {order.date}
-                  </p>
-                </div>
-                <p style={{ fontWeight: 900, fontSize: '1rem', color: '#009739', flexShrink: 0 }}>
-                  ${order.total.toFixed(2)}
-                </p>
-              </div>
-
-              {/* Mini tracker */}
-              <div className="mt-3">
-                <MiniTracker escrowStatus={order.escrowStatus} />
-                <div className="flex items-center justify-between mt-1.5">
-                  <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: sc.bg, color: sc.text, fontWeight: 700 }}>
-                    {stepLabel}
-                  </span>
-                  {order.trackingNumber && (
-                    <span className="flex items-center gap-1 text-xs text-blue-600 font-mono" style={{ fontWeight: 500 }}>
-                      <Truck className="w-3 h-3" /> {order.trackingNumber}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+        <div className="px-5 py-4.5 flex items-center gap-4">
+          <div className="w-[52px] h-[52px] rounded-xl overflow-hidden bg-gray-100 shrink-0 cursor-pointer"
+            onClick={() => firstItem && navigate(`/product/${firstItem.product.id}`)}>
+            {firstItem && (
+              <img src={firstItem.product.image} alt={firstItem.product.name}
+                className="w-full h-full object-cover" />
+            )}
           </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-gray-900 truncate" style={{ fontWeight: 600, fontSize: '0.92rem' }}>
+              {firstItem?.product.name}
+              {order.items.length > 1 && (
+                <span className="text-gray-400 text-xs" style={{ fontWeight: 500 }}>
+                  {' '}+{order.items.length - 1} more
+                </span>
+              )}
+            </p>
+            <p className="text-gray-400 text-xs mt-0.5">
+              {firstItem?.product.sellerName} · {order.date}
+            </p>
+          </div>
+          <p className="shrink-0" style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111' }}>
+            ${order.total.toFixed(2)}
+          </p>
+          <span className="shrink-0 px-3 py-1.5 rounded-full text-xs" style={{ background: sc.bg, color: sc.text, fontWeight: 700 }}>
+            {stepLabel}
+          </span>
         </div>
 
         {/* Action bar */}
@@ -406,20 +385,8 @@ function EmptyState({ tab }: { tab: string }) {
 // ─── Main Orders page ─────────────────────────────────────────────────────────
 export function Orders() {
   const { placedOrders } = useStore();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all');
-
   const allPlaced = [...placedOrders];
-
-  const filteredPlaced = activeTab === 'all' ? allPlaced
-    : activeTab === 'active' ? allPlaced.filter(o => ['pending','confirmed','in_transit'].includes(o.status))
-    : allPlaced.filter(o => o.status === 'delivered' || o.status === 'cancelled');
-
-  const totalCount     = allPlaced.length;
-  const activeCount    = allPlaced.filter(o => ['pending','confirmed','in_transit'].includes(o.status)).length;
-  const deliveredCount = allPlaced.filter(o => o.status === 'delivered').length;
-
-  const isEmpty = filteredPlaced.length === 0;
+  const isEmpty = allPlaced.length === 0;
 
   return (
     <div className="bg-white min-h-screen">
@@ -427,91 +394,18 @@ export function Orders() {
 
         <Breadcrumbs className="mb-6" crumbs={[{ label: 'My Orders' }]} />
 
-        {/* Page header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-gray-900" style={{ fontWeight: 900, fontSize: '1.6rem' }}>My Orders</h1>
-          <button onClick={() => navigate('/shop')}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#009739] hover:bg-[#007f30] text-white rounded-xl text-sm border-none cursor-pointer transition-colors"
-            style={{ fontWeight: 600 }}>
-            Continue Shopping
-          </button>
-        </div>
+        <h1 className="text-gray-900" style={{ fontWeight: 900, fontSize: '1.6rem' }}>My orders</h1>
+        <p className="text-sm text-gray-400 mt-1.5 mb-6">Track purchases from sellers across Zimbabwe.</p>
 
-        {/* Stats strip */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          {[
-            { label: 'Total Orders', value: totalCount, color: '#111', icon: Package },
-            { label: 'Active', value: activeCount, color: '#856404', icon: Clock },
-            { label: 'Delivered', value: deliveredCount, color: '#009739', icon: CheckCircle2 },
-          ].map(({ label, value, color, icon: Icon }) => (
-            <div key={label} className="bg-white border border-[#EAEAEA] rounded-2xl p-4 flex items-center gap-3" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: color === '#009739' ? 'rgba(0,151,57,0.08)' : color === '#856404' ? 'rgba(255,209,0,0.12)' : '#f3f4f6' }}>
-                <Icon className="w-4 h-4" style={{ color }} />
-              </div>
-              <div>
-                <p style={{ fontSize: '1.3rem', fontWeight: 900, color }}>{value}</p>
-                <p className="text-gray-400" style={{ fontSize: '0.72rem' }}>{label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1 bg-white border border-[#EAEAEA] p-1 rounded-xl mb-5 w-fit" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          {[
-            { key: 'all', label: 'All Orders' },
-            { key: 'active', label: 'Active', count: activeCount },
-            { key: 'completed', label: 'Completed', count: deliveredCount },
-          ].map(tab => (
-            <button key={tab.key}
-              onClick={() => setActiveTab(tab.key as typeof activeTab)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs transition-all border-none cursor-pointer"
-              style={{
-                background: activeTab === tab.key ? '#009739' : 'transparent',
-                color: activeTab === tab.key ? '#fff' : '#9ca3af',
-                fontWeight: activeTab === tab.key ? 700 : 500,
-              }}>
-              {tab.label}
-              {tab.count != null && tab.count > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full"
-                  style={{
-                    background: activeTab === tab.key ? 'rgba(255,255,255,0.25)' : '#f3f4f6',
-                    color: activeTab === tab.key ? '#fff' : '#6b7280',
-                    fontSize: '0.6rem', fontWeight: 700,
-                  }}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Order list */}
         {isEmpty ? (
-          <EmptyState tab={activeTab} />
+          <EmptyState tab="all" />
         ) : (
           <div className="space-y-3">
-            {filteredPlaced.map(order => (
+            {allPlaced.map(order => (
               <PlacedOrderCard key={order.id} order={order} />
             ))}
           </div>
         )}
-
-        {/* Trust center link */}
-        <div className="mt-8 p-4 rounded-2xl flex items-center gap-3"
-          style={{ background: 'rgba(0,151,57,0.04)', border: '1px solid rgba(0,151,57,0.12)' }}>
-          <ShieldCheck className="w-5 h-5 text-[#009739] shrink-0" />
-          <div className="flex-1">
-            <p className="text-gray-900" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Protected by EcoCash Escrow</p>
-            <p className="text-gray-400" style={{ fontSize: '0.72rem' }}>Your money is safe until you confirm delivery.</p>
-          </div>
-          <button onClick={() => navigate('/trust-center')}
-            className="flex items-center gap-1 text-[#009739] text-xs bg-transparent border-none cursor-pointer shrink-0"
-            style={{ fontWeight: 600 }}>
-            Learn more <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
       </div>
     </div>
   );

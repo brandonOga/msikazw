@@ -130,6 +130,13 @@ export interface Testimonial {
   role: 'buyer' | 'seller';
 }
 
+// ─── Zimbabwean cities ─────────────────────────────────────────────────
+export const ZIM_CITIES = [
+  'Harare', 'Bulawayo', 'Chitungwiza', 'Mutare', 'Gweru',
+  'Kwekwe', 'Kadoma', 'Masvingo', 'Chinhoyi', 'Norton',
+  'Marondera', 'Ruwa', 'Chegutu', 'Zvishavane', 'Bindura',
+];
+
 // ─── Categories (Online Marketplace) ──────────────────────────────────
 
 export const categories: Category[] = [

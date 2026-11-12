@@ -66,6 +66,8 @@ export async function submitSellerApplication(
       ecocash_phone: app.phone,
       logo_url: app.logoUrl ?? null,
       banner_url: app.bannerUrl ?? null,
+      bank_name: app.bankName ?? null,
+      bank_account: app.bankAccount ?? null,
     })
     .select()
     .single();

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router';
-import { Mail, ArrowLeft, Loader2, CheckCircle2, Store } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { requestPasswordReset } from '../../lib/db/auth';
+import { MsikaLogo } from '../components/MsikaLogo';
 
 export const ForgotPassword = () => {
   const [email, setEmail]   = useState('');
@@ -21,16 +22,14 @@ export const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 w-full max-w-sm p-8">
+    <div className="min-h-[80vh] flex items-center justify-center bg-white py-12 px-4">
+      <div className="max-w-md w-full bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
         <Link to="/login" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 mb-6 no-underline">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to login
         </Link>
         <div className="text-center mb-6">
           <Link to="/" className="inline-block no-underline">
-            <div className="mx-auto w-12 h-12 bg-[#009739] rounded-xl flex items-center justify-center">
-              <Store className="w-6 h-6 text-white" />
-            </div>
+            <MsikaLogo size="lg" />
           </Link>
         </div>
 
@@ -44,13 +43,13 @@ export const ForgotPassword = () => {
               We sent a password reset link to <strong>{email}</strong>. Check your inbox and click the link to continue.
             </p>
             <Link to="/login" className="text-sm text-[#009739] no-underline" style={{ fontWeight: 600 }}>
-              Return to login
+              Back to log in
             </Link>
           </div>
         ) : (
           <>
-            <h1 className="text-2xl text-gray-900 mb-1" style={{ fontWeight: 900 }}>Forgot password?</h1>
-            <p className="text-sm text-gray-500 mb-6">Enter your email and we'll send you a reset link.</p>
+            <h1 className="text-2xl text-gray-900 mb-1 text-center" style={{ fontWeight: 900 }}>Reset your password</h1>
+            <p className="text-sm text-gray-500 mb-6 text-center">We'll email a reset link to you.</p>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
@@ -62,7 +61,7 @@ export const ForgotPassword = () => {
                     type="email"
                     value={email}
                     onChange={e => { setEmail(e.target.value); setError(''); }}
-                    placeholder="you@example.com"
+                    placeholder="tendai@email.com"
                     className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900"
                   />
                 </div>

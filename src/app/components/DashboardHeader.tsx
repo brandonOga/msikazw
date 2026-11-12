@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { ChevronDown, LogOut, LayoutDashboard, Store, Bell, ShoppingBag } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { MsikaLogo } from './MsikaLogo';
+import { getNotificationDestination } from '../../lib/notificationDestination';
 
 export const HEADER_H = 56; // px
 
@@ -11,7 +12,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ role }: DashboardHeaderProps) {
-  const { user, logout, notifications, unreadCount, markAllRead } = useStore();
+  const { user, logout, notifications, unreadCount, markAllRead, markNotificationRead, sellerDbId } = useStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -52,7 +53,7 @@ export function DashboardHeader({ role }: DashboardHeaderProps) {
       {/* Notification bell */}
       <div className="relative" ref={notifsRef}>
         <button
-          onClick={() => { setShowNotifs(!showNotifs); if (!showNotifs) markAllRead(); }}
+          onClick={() => setShowNotifs(!showNotifs)}
           className="relative p-2 text-gray-500 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-50"
           aria-label="Notifications"
         >
@@ -81,20 +82,24 @@ export function DashboardHeader({ role }: DashboardHeaderProps) {
                 {notifications.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-8">No notifications</p>
                 ) : notifications.map(n => (
-                  <div
+                  <button
                     key={n.id}
-                    className="px-4 py-3 border-b border-gray-50 last:border-0"
+                    onClick={() => {
+                      markNotificationRead(n.id);
+                      setShowNotifs(false);
+                      const { path, params } = getNotificationDestination(n, role);
+                      navigate(params ? `${path}?${new URLSearchParams(params)}` : path);
+                    }}
+                    className="w-full flex items-start gap-2 px-4 py-3 border-0 border-b border-gray-50 last:border-b-0 text-left cursor-pointer bg-transparent hover:bg-gray-50 transition-colors"
                     style={{ background: n.read ? '#fff' : 'rgba(0,151,57,0.04)' }}
                   >
-                    <div className="flex items-start gap-2">
-                      <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: n.read ? '#d1d5db' : '#009739' }} />
-                      <div>
-                        <p className="text-xs text-gray-900" style={{ fontWeight: 600 }}>{n.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
-                        <p className="text-[11px] text-gray-400 mt-1">{n.time}</p>
-                      </div>
+                    <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: n.read ? '#d1d5db' : '#009739' }} />
+                    <div>
+                      <p className="text-xs text-gray-900" style={{ fontWeight: 600 }}>{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">{n.time}</p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -157,7 +162,7 @@ export function DashboardHeader({ role }: DashboardHeaderProps) {
                   <LayoutDashboard className="w-4 h-4 text-gray-400" /> Dashboard
                 </button>
                 <button
-                  onClick={() => { navigate('/shop'); setOpen(false); }}
+                  onClick={() => { navigate(sellerDbId ? `/store/${sellerDbId}` : '/shop'); setOpen(false); }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer border-none bg-transparent text-left"
                 >
                   <Store className="w-4 h-4 text-gray-400" /> Visit Store

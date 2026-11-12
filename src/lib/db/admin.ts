@@ -41,43 +41,34 @@ export async function updateSellerApplicationStatus(
 ) {
   if (!isSupabaseConfigured) return;
 
+  // The actual status change (and, on approval, the role bump) happens
+  // directly against Supabase under RLS — this must not depend on the
+  // /api/admin/* serverless endpoints being reachable (they aren't under
+  // plain `vite` dev without `vercel dev`, and shouldn't gate the core
+  // action even when they are reachable).
   const update: Record<string, unknown> = { status };
   if (reviewNotes) update.review_notes = reviewNotes;
+  if (status === 'approved') update.approved_at = new Date().toISOString();
+  const { data: seller, error } = await supabase.from('sellers').update(update).eq('id', id).select('user_id').single();
+  if (error) { console.error('[admin] updateSellerApplicationStatus:', error); return; }
 
-  const { error } = await supabase.from('sellers').update(update).eq('id', id);
-  if (error) console.error('[admin] updateSellerApplicationStatus:', error);
+  if (status === 'approved' && seller?.user_id) {
+    const { error: roleError } = await supabase.from('profiles').update({ role: 'seller' }).eq('id', seller.user_id);
+    if (roleError) console.error('[admin] failed to grant seller role:', roleError);
+  }
 
-  // If approved, also update the user's role in profiles
+  // Notify the seller by email — needs the service role to resolve their
+  // auth email, so this goes through the serverless endpoint. Best-effort:
+  // the status change above has already succeeded regardless of this.
   if (status === 'approved' || status === 'rejected') {
-    const { data: seller } = await supabase
-      .from('sellers')
-      .select('user_id, reference_no, profiles(name)')
-      .eq('id', id)
-      .single();
-
-    if (seller?.user_id) {
-      if (status === 'approved') {
-        await supabase.from('profiles').update({ role: 'seller' }).eq('id', seller.user_id);
-      }
-
-      // Send status notification email (non-blocking)
-      const { data: authUser } = await supabase.auth.admin.getUserById(seller.user_id).catch(() => ({ data: null }));
-      const email = authUser?.user?.email;
-      const name = (seller.profiles as unknown as Record<string, string> | null)?.name || 'Seller';
-      const referenceNo = seller.reference_no as string;
-      if (email && referenceNo && typeof window !== 'undefined') {
-        fetch('/api/send-seller-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: email,
-            name,
-            referenceNumber: referenceNo,
-            type: status === 'approved' ? 'application_approved' : 'application_rejected',
-          }),
-        }).catch(err => console.warn('[admin] notify email error', err));
-      }
-    }
+    const endpoint = status === 'approved' ? '/api/admin/approve-seller' : '/api/admin/reject-seller';
+    const body = status === 'approved' ? { sellerId: id, reviewNotes } : { sellerId: id, reason: reviewNotes };
+    fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(res => { if (!res.ok) console.warn(`[admin] ${endpoint} email step failed:`, res.status); })
+      .catch(err => console.warn(`[admin] ${endpoint} email step unreachable:`, err));
   }
 }
 

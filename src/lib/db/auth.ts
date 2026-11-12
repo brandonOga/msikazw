@@ -60,7 +60,7 @@ export async function getProfile(userId: string) {
     .single();
 
   if (error) { console.error('[auth] getProfile:', error); return null; }
-  return data as { id: string; name: string; phone: string | null; role: UserRole; location: string | null };
+  return data as { id: string; name: string; phone: string | null; role: UserRole; location: string | null; preferred_payment: string | null };
 }
 
 export async function resendConfirmationEmail(email: string): Promise<{ error: string | null }> {
@@ -98,12 +98,16 @@ export async function updatePassword(newPassword: string): Promise<{ error: stri
   return { error: error ? error.message : null };
 }
 
-export async function updateProfile(userId: string, updates: { name?: string; phone?: string; location?: string }) {
+export async function updateProfile(userId: string, updates: { name?: string; phone?: string; location?: string; preferredPayment?: string }) {
   if (!isSupabaseConfigured) return null;
+
+  const { preferredPayment, ...rest } = updates;
+  const dbUpdates: Record<string, unknown> = { ...rest };
+  if (preferredPayment !== undefined) dbUpdates.preferred_payment = preferredPayment;
 
   const { data, error } = await supabase
     .from('profiles')
-    .update(updates)
+    .update(dbUpdates)
     .eq('id', userId)
     .select()
     .single();
